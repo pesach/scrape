@@ -14,13 +14,15 @@ class BackblazeB2Storage:
     """Backblaze B2 storage client using S3-compatible API"""
     
     def __init__(self):
-        self.key_id = os.getenv("B2_APPLICATION_KEY_ID")
-        self.application_key = os.getenv("B2_APPLICATION_KEY")
-        self.bucket_name = os.getenv("B2_BUCKET_NAME")
-        self.endpoint_url = os.getenv("B2_ENDPOINT_URL")
+        from config import config
+        
+        self.key_id = config.B2_APPLICATION_KEY_ID
+        self.application_key = config.B2_APPLICATION_KEY
+        self.bucket_name = config.B2_BUCKET_NAME
+        self.endpoint_url = config.B2_ENDPOINT_URL
         
         if not all([self.key_id, self.application_key, self.bucket_name, self.endpoint_url]):
-            raise ValueError("Missing Backblaze B2 configuration. Please set B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_NAME, and B2_ENDPOINT_URL")
+            raise ValueError("Missing Backblaze B2 configuration. Please configure B2 secrets in GitHub or .env file")
         
         # Create S3 client configured for Backblaze B2
         self.s3_client = boto3.client(

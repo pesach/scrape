@@ -5,11 +5,14 @@ from kombu import Queue
 # Create Celery instance
 celery_app = Celery('youtube_scraper')
 
+# Load configuration
+from config import config
+
 # Configuration
 celery_app.conf.update(
     # Broker settings
-    broker_url=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
-    result_backend=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+    broker_url=config.REDIS_URL,
+    result_backend=config.REDIS_URL,
     
     # Task settings
     task_serializer='json',

@@ -7,11 +7,12 @@ from datetime import datetime
 
 class Database:
     def __init__(self):
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        if not url or not key:
-            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables")
-        self.supabase: Client = create_client(url, key)
+        from config import config
+        
+        if not config.SUPABASE_URL or not config.SUPABASE_KEY:
+            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be configured")
+        
+        self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
     
     async def create_youtube_url(self, url: str, url_type: URLType, title: str = None, description: str = None) -> YouTubeURLResponse:
         """Create a new YouTube URL entry"""

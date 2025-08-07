@@ -10,9 +10,8 @@ from pathlib import Path
 # Add the current directory to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
+# Load configuration (handles both .env and GitHub secrets)
+from config import config
 
 # Setup logging
 from logging_config import setup_logging
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # Check Redis connection
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_url = config.REDIS_URL
     
     try:
         import redis

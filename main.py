@@ -9,9 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import traceback
 
-# Load environment variables first
-from dotenv import load_dotenv
-load_dotenv()
+# Load configuration (handles both .env and environment variables)
+from config import config
 
 # Setup logging
 from logging_config import setup_logging
@@ -129,8 +128,7 @@ async def health_check():
     status["components"]["celery"] = "available" if scrape_task else "not available"
     
     # Check environment variables
-    required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "B2_APPLICATION_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_NAME"]
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    is_valid, missing_vars = config.validate()
     
     if missing_vars:
         status["components"]["environment"] = f"missing variables: {', '.join(missing_vars)}"
@@ -408,14 +406,15 @@ async def dashboard_data():
 async def debug_info():
     """Debug information endpoint"""
     debug_data = {
+        "configuration": config.get_config_summary(),
         "environment_variables": {
-            "SUPABASE_URL": "✅" if os.getenv("SUPABASE_URL") else "❌",
-            "SUPABASE_KEY": "✅" if os.getenv("SUPABASE_KEY") else "❌",
-            "B2_APPLICATION_KEY_ID": "✅" if os.getenv("B2_APPLICATION_KEY_ID") else "❌",
-            "B2_APPLICATION_KEY": "✅" if os.getenv("B2_APPLICATION_KEY") else "❌",
-            "B2_BUCKET_NAME": "✅" if os.getenv("B2_BUCKET_NAME") else "❌",
-            "B2_ENDPOINT_URL": "✅" if os.getenv("B2_ENDPOINT_URL") else "❌",
-            "REDIS_URL": "✅" if os.getenv("REDIS_URL") else "❌",
+            "SUPABASE_URL": "✅" if config.SUPABASE_URL else "❌",
+            "SUPABASE_KEY": "✅" if config.SUPABASE_KEY else "❌",
+            "B2_APPLICATION_KEY_ID": "✅" if config.B2_APPLICATION_KEY_ID else "❌",
+            "B2_APPLICATION_KEY": "✅" if config.B2_APPLICATION_KEY else "❌",
+            "B2_BUCKET_NAME": "✅" if config.B2_BUCKET_NAME else "❌",
+            "B2_ENDPOINT_URL": "✅" if config.B2_ENDPOINT_URL else "❌",
+            "REDIS_URL": "✅" if config.REDIS_URL else "❌",
         },
         "components": {
             "database": db is not None,
@@ -424,6 +423,7 @@ async def debug_info():
         },
         "python_path": os.getcwd(),
         "template_directory_exists": os.path.exists("templates"),
+        "config_source": "GitHub Secrets + Environment Variables" if not Path(".env").exists() else ".env file + Environment Variables"
     }
     
     return debug_data

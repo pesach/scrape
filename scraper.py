@@ -39,8 +39,10 @@ class VideoScraper:
     """
     
     def __init__(self):
-        self.download_path = os.getenv("DOWNLOAD_PATH", "/tmp/youtube_downloads")
-        self.max_file_size_gb = float(os.getenv("MAX_FILE_SIZE_GB", "5"))
+        from config import config
+        
+        self.download_path = config.DOWNLOAD_PATH
+        self.max_file_size_gb = config.MAX_FILE_SIZE_GB
         
         # Create download directory if it doesn't exist
         Path(self.download_path).mkdir(parents=True, exist_ok=True)

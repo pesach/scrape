@@ -129,6 +129,27 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
 
 ## Configuration
 
+You can configure the application in two ways:
+
+### **Option 1: GitHub Repository Secrets (Recommended for Production)**
+
+1. **Go to your GitHub repository**
+2. **Settings → Secrets and variables → Actions → New repository secret**
+3. **Add these secrets:**
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_KEY=your_supabase_anon_key
+   B2_APPLICATION_KEY_ID=your_b2_key_id
+   B2_APPLICATION_KEY=your_b2_application_key
+   B2_BUCKET_NAME=your_bucket_name
+   B2_ENDPOINT_URL=https://s3.us-west-004.backblazeb2.com
+   REDIS_URL=redis://localhost:6379/0
+   ```
+
+✅ **Benefits**: Secure, no .env file needed, works with CI/CD, easy deployment
+
+### **Option 2: Local .env File (For Development)**
+
 1. **Copy environment variables**:
    ```bash
    cp .env.example .env
@@ -149,25 +170,30 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
    - Create a bucket for storing videos
    - Update `.env` with your B2 credentials
 
-4. **Update environment variables in `.env`**:
-   ```env
-   # Supabase Configuration
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=your-anon-key
-   
-   # Backblaze B2 Configuration
-   B2_APPLICATION_KEY_ID=your-key-id
-   B2_APPLICATION_KEY=your-application-key
-   B2_BUCKET_NAME=your-bucket-name
-   B2_ENDPOINT_URL=https://s3.us-west-004.backblazeb2.com
-   
-   # Redis Configuration
-   REDIS_URL=redis://localhost:6379/0
-   
-   # Application Configuration
-   DOWNLOAD_PATH=/tmp/youtube_downloads
-   MAX_FILE_SIZE_GB=5
-   ```
+4. **Update environment variables in `.env`** (same values as GitHub secrets above)
+
+## 🐳 **Docker Deployment (Uses Environment Variables)**
+
+```bash
+# With environment variables
+docker-compose up -d
+
+# Or with explicit variables
+SUPABASE_URL=your_url SUPABASE_KEY=your_key docker-compose up -d
+```
+
+## ☁️ **Cloud Deployment Examples**
+
+**Heroku:**
+```bash
+heroku config:set SUPABASE_URL=your_url
+heroku config:set SUPABASE_KEY=your_key
+# ... other variables
+```
+
+**Railway/Render/Vercel:**
+- Add environment variables in their dashboard
+- No .env file needed!
 
 ## Usage
 

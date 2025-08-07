@@ -10,9 +10,8 @@ from pathlib import Path
 # Add the current directory to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
+# Load configuration (handles both .env and GitHub secrets)
+from config import config
 
 # Setup logging first
 from logging_config import setup_logging
@@ -23,17 +22,13 @@ from main import app
 import uvicorn
 
 if __name__ == "__main__":
-    # Check required environment variables
-    required_vars = [
-        "SUPABASE_URL", "SUPABASE_KEY",
-        "B2_APPLICATION_KEY_ID", "B2_APPLICATION_KEY", 
-        "B2_BUCKET_NAME", "B2_ENDPOINT_URL"
-    ]
-    
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    if missing_vars:
-        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
-        print("Please copy .env.example to .env and configure the required variables.")
+    # Check required configuration
+    is_valid, missing_vars = config.validate()
+    if not is_valid:
+        print(f"❌ Missing required configuration: {', '.join(missing_vars)}")
+        print("Please configure via GitHub Repository Secrets or .env file:")
+        print("GitHub: Repository → Settings → Secrets and variables → Actions")
+        print("Local: Copy .env.example to .env and configure")
         sys.exit(1)
     
     print("🚀 Starting YouTube Video Scraper...")
