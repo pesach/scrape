@@ -195,6 +195,31 @@ heroku config:set SUPABASE_KEY=your_key
 - Add environment variables in their dashboard
 - No .env file needed!
 
+## 🚀 **Server Deployment (Auto-Updates)**
+
+### **Quick Setup:**
+```bash
+# 1. Get a VPS (DigitalOcean, AWS, etc.)
+# 2. Run the automated setup script:
+git clone https://github.com/yourusername/youtube-video-scraper.git
+cd youtube-video-scraper
+sudo ./deploy/setup_server.sh
+
+# 3. Configure your secrets:
+sudo cp /etc/environment.template /etc/environment
+sudo nano /etc/environment  # Add your actual values
+
+# 4. Start services:
+sudo systemctl start youtube-scraper youtube-worker
+```
+
+### **Auto-Update Options:**
+1. **GitHub Webhooks** (Recommended) - Instant deployment on git push
+2. **Cron Jobs** - Check for updates every 5 minutes  
+3. **Manual Updates** - Run `/home/youtube-scraper/update.sh`
+
+Your server will automatically pull and deploy the latest code from GitHub! 🎯
+
 ## Usage
 
 ### Starting the Application
@@ -408,6 +433,7 @@ Before deploying, verify:
 This comprehensive testing approach ensures your system works correctly before processing real YouTube videos!
 
 📖 **For detailed testing instructions, see [TESTING.md](TESTING.md)**
+📖 **For server deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
 
 ## Database Schema
 
