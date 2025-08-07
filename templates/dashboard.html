@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - YouTube Video Scraper{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>
+            <i class="fas fa-tachometer-alt"></i>
+            Dashboard
+        </h2>
+        <p class="text-muted">Monitor your YouTube scraping jobs and videos</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Total URLs</h5>
+                        <h3 id="totalUrls">-</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-link fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Pending Jobs</h5>
+                        <h3 id="pendingJobs">-</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Completed</h5>
+                        <h3 id="completedJobs">-</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Total Videos</h5>
+                        <h3 id="totalVideos">-</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-video fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- URLs and Jobs Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i>
+                    Submitted URLs
+                </h5>
+                <button class="btn btn-outline-primary btn-sm" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="urlsTable">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Loading data...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    const urlsTable = document.getElementById('urlsTable');
+    
+    // Load dashboard data
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('/api/dashboard-data');
+            const data = await response.json();
+            
+            // Update statistics
+            document.getElementById('totalUrls').textContent = data.stats.total_urls;
+            document.getElementById('pendingJobs').textContent = data.stats.pending_jobs;
+            document.getElementById('completedJobs').textContent = data.stats.completed_jobs;
+            document.getElementById('totalVideos').textContent = data.stats.total_videos;
+            
+            // Update URLs table
+            displayUrlsTable(data.urls);
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            urlsTable.innerHTML = '<div class="alert alert-danger">Error loading data</div>';
+        }
+    }
+    
+    function displayUrlsTable(urls) {
+        if (urls.length === 0) {
+            urlsTable.innerHTML = '<p class="text-muted">No URLs submitted yet.</p>';
+            return;
+        }
+        
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>URL</th>
+                            <th>Type</th>
+                            <th>Submitted</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        urls.forEach(url => {
+            const urlType = url.url_type.charAt(0).toUpperCase() + url.url_type.slice(1);
+            const date = new Date(url.created_at).toLocaleDateString();
+            const shortUrl = url.url.length > 50 ? url.url.substring(0, 50) + '...' : url.url;
+            
+            html += `
+                <tr>
+                    <td>
+                        <strong>${url.title || 'Untitled'}</strong>
+                        ${url.description ? `<br><small class="text-muted">${url.description.substring(0, 100)}...</small>` : ''}
+                    </td>
+                    <td>
+                        <a href="${url.url}" target="_blank" class="text-decoration-none">
+                            ${shortUrl}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge bg-info url-type-badge">${urlType}</span>
+                    </td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDetails('${url.id}')">
+                            <i class="fas fa-eye"></i>
+                            Details
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        urlsTable.innerHTML = html;
+    }
+    
+    // View URL details
+    window.viewDetails = async function(urlId) {
+        try {
+            // Get URL details
+            const urlResponse = await fetch(`/api/urls/${urlId}`);
+            const urlData = await urlResponse.json();
+            
+            // Get videos for this URL
+            const videosResponse = await fetch(`/api/urls/${urlId}/videos`);
+            const videos = await videosResponse.json();
+            
+            // Show modal with details
+            showDetailsModal(urlData, videos);
+            
+        } catch (error) {
+            console.error('Error loading details:', error);
+            alert('Error loading details');
+        }
+    };
+    
+    function showDetailsModal(urlData, videos) {
+        const modalHtml = `
+            <div class="modal fade" id="detailsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">URL Details</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <h6>URL Information</h6>
+                            <table class="table table-sm">
+                                <tr><td><strong>Title:</strong></td><td>${urlData.title || 'N/A'}</td></tr>
+                                <tr><td><strong>URL:</strong></td><td><a href="${urlData.url}" target="_blank">${urlData.url}</a></td></tr>
+                                <tr><td><strong>Type:</strong></td><td>${urlData.url_type}</td></tr>
+                                <tr><td><strong>Submitted:</strong></td><td>${new Date(urlData.created_at).toLocaleString()}</td></tr>
+                            </table>
+                            
+                            <h6 class="mt-3">Videos (${videos.length})</h6>
+                            ${videos.length > 0 ? generateVideosTable(videos) : '<p class="text-muted">No videos found.</p>'}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('detailsModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+        modal.show();
+    }
+    
+    function generateVideosTable(videos) {
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Duration</th>
+                            <th>Views</th>
+                            <th>Resolution</th>
+                            <th>File Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        videos.forEach(video => {
+            const duration = video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : 'N/A';
+            const views = video.view_count ? video.view_count.toLocaleString() : 'N/A';
+            const fileSize = video.file_size ? formatFileSize(video.file_size) : 'N/A';
+            
+            html += `
+                <tr>
+                    <td>
+                        <strong>${video.title}</strong><br>
+                        <small class="text-muted">by ${video.uploader || 'Unknown'}</small>
+                    </td>
+                    <td>${duration}</td>
+                    <td>${views}</td>
+                    <td>${video.resolution || 'N/A'}</td>
+                    <td>${fileSize}</td>
+                    <td>
+                        ${video.b2_file_url ? `<a href="${video.b2_file_url}" target="_blank" class="btn btn-sm btn-outline-primary">Download</a>` : 'N/A'}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        return html;
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Refresh button
+    refreshBtn.addEventListener('click', function() {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+        
+        loadDashboardData().finally(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+        });
+    });
+    
+    // Load data on page load
+    loadDashboardData();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+});
+</script>
+{% endblock %}
