@@ -255,6 +255,160 @@ curl "http://localhost:8000/api/jobs/{job_id}"
 curl "http://localhost:8000/api/urls/{url_id}/videos"
 ```
 
+## 🧪 **Testing & Verification**
+
+### **GitHub Secrets Verification**
+
+#### **Method 1: Automated Test Workflow (Recommended)**
+The most reliable way to verify your GitHub secrets:
+
+1. **Push your code to GitHub**:
+   ```bash
+   git add -A
+   git commit -m "Add GitHub secrets configuration"
+   git push origin main
+   ```
+
+2. **Run the test workflow**:
+   - Go to: **Repository → Actions**
+   - Find: **"Test GitHub Secrets Configuration"**
+   - Click: **"Run workflow" → "Run workflow"**
+   - Watch the results - all steps should pass ✅
+
+3. **Interpret results**:
+   - ✅ **All green**: Secrets configured correctly
+   - ❌ **Any red**: Check that specific secret in GitHub
+
+#### **Method 2: Local Verification Script**
+```bash
+python verify_secrets.py
+```
+
+This script will:
+- 📋 Show expected secret format and examples
+- 🔍 Validate secret formats if set locally
+- 💡 Provide setup instructions
+- 🚀 Guide you through the testing process
+
+#### **Method 3: Manual Component Testing**
+Test individual components:
+
+```bash
+# Test configuration loading
+python -c "from config import config; print('Config:', config.get_config_summary())"
+
+# Test database connection
+python -c "from database import db; print('✅ Database ready')"
+
+# Test Backblaze B2 storage
+python -c "from storage import storage; print('✅ B2 storage ready')"
+
+# Test YouTube parser
+python -c "from youtube_parser import parse_youtube_url; print('✅ Parser ready')"
+```
+
+### **Setup Verification**
+
+#### **Comprehensive Setup Test**
+```bash
+python test_setup.py
+```
+
+This tests:
+- ✅ All required Python packages
+- ✅ Environment variables/configuration
+- ✅ Redis connection
+- ✅ FFmpeg availability
+- ✅ YouTube URL parsing
+
+#### **Simple Metadata Test**
+```bash
+python simple_demo.py
+```
+- Opens a test server at `http://localhost:8001`
+- Tests metadata extraction without external dependencies
+- Good for isolating YouTube parsing issues
+
+### **Health Check Endpoints**
+
+Once your application is running:
+
+```bash
+# Check overall system health
+curl http://localhost:8000/health
+
+# Debug configuration issues
+curl http://localhost:8000/debug
+
+# Monitor queue status and system load
+curl http://localhost:8000/api/queue-status
+```
+
+### **Required GitHub Secrets Reference**
+
+Your GitHub Repository Secrets should have **exactly** these names and formats:
+
+```
+Secret Name: SUPABASE_URL
+Format: https://your-project.supabase.co
+Example: https://abcdefghijk.supabase.co
+
+Secret Name: SUPABASE_KEY  
+Format: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Note: Use the anon/public key, NOT the service_role key
+
+Secret Name: B2_APPLICATION_KEY_ID
+Format: 005a1b2c3d4e5f6789abcdef
+Length: ~25 characters
+
+Secret Name: B2_APPLICATION_KEY
+Format: K005abcdef1234567890...
+Length: ~40+ characters
+
+Secret Name: B2_BUCKET_NAME
+Format: my-youtube-videos
+Rules: Lowercase, numbers, hyphens, underscores only
+
+Secret Name: B2_ENDPOINT_URL
+Format: https://s3.us-west-004.backblazeb2.com
+Note: Replace region as needed for your B2 bucket
+```
+
+### **Testing Checklist**
+
+Before deploying, verify:
+
+- [ ] **GitHub Secrets**: All 6 secrets added with correct names
+- [ ] **Test Workflow**: Passes all steps without errors
+- [ ] **Local Verification**: `python verify_secrets.py` shows valid config
+- [ ] **Setup Test**: `python test_setup.py` passes all components
+- [ ] **Health Endpoints**: Return successful responses
+- [ ] **Simple Demo**: `python simple_demo.py` works for metadata
+- [ ] **Database Schema**: Applied to your Supabase project
+
+### **Common Issues & Solutions**
+
+| Issue | Solution |
+|-------|----------|
+| "Missing configuration" | Check GitHub secret names match exactly |
+| "Invalid Supabase key" | Use anon/public key, not service_role key |
+| "B2 upload failed" | Verify bucket name and endpoint URL region |
+| "Redis connection failed" | Install and start Redis locally |
+| "yt-dlp not found" | Run `pip install yt-dlp` |
+| "FFmpeg not found" | Install FFmpeg for your OS |
+
+### **Debugging Tips**
+
+1. **Check logs**: Look in `logs/youtube_scraper.log` and `logs/errors.log`
+2. **Use debug endpoint**: Visit `/debug` to see configuration status
+3. **Test incrementally**: Start with simple demo, then full system
+4. **Monitor workflows**: GitHub Actions will show exact error messages
+5. **Validate secrets**: Use the verification script before deployment
+
+This comprehensive testing approach ensures your system works correctly before processing real YouTube videos!
+
+📖 **For detailed testing instructions, see [TESTING.md](TESTING.md)**
+
 ## Database Schema
 
 The system uses the following main tables:
@@ -478,6 +632,28 @@ Enable debug logging by setting the log level to DEBUG in `logging_config.py`.
 
 ### **Q: How much storage space is needed?**
 **A: Minimal!** Videos are only stored temporarily during upload. Permanent storage is in Backblaze B2 cloud.
+
+### **Q: How do I verify my GitHub secrets are configured correctly?**
+**A: Multiple ways:**
+1. **Best**: Run the "Test GitHub Secrets Configuration" workflow in GitHub Actions
+2. **Local**: Run `python verify_secrets.py` to check format and get instructions
+3. **Quick**: Check `/health` and `/debug` endpoints once app is running
+4. **Component**: Test individual parts with the manual commands in the Testing section
+
+### **Q: The test workflow failed, what does each step mean?**
+**A: Each step tests a specific component:**
+- **Configuration Loading**: Your secrets are present and valid format
+- **Database Connection**: Supabase URL and key work correctly  
+- **B2 Configuration**: Backblaze credentials and bucket are accessible
+- **YouTube Parser**: yt-dlp can extract metadata from YouTube
+- If any step fails, that specific component needs attention
+
+### **Q: Can I test the system without setting up all the external services?**
+**A: Yes!** Use the simple demo:
+```bash
+python simple_demo.py  # Test only YouTube metadata extraction
+```
+This works without Supabase, Backblaze B2, or Redis - just yt-dlp.
 
 ## Contributing
 
