@@ -196,82 +196,82 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
             
             if not youtube_parser:
                 raise HTTPException(status_code=503, detail="YouTube parser not available")
-        
-        # Validate and parse the URL
-        try:
-            url_type, identifier = parse_youtube_url(url_data.url)
-            normalized_url = youtube_parser.normalize_url(url_data.url)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {str(e)}")
-        
-        # Extract basic metadata using yt-dlp (NO YouTube API needed)
-        # IMPORTANT: This uses web scraping, not API calls
-        # Benefits: No API keys, no rate limits, works with private videos
-        title = None
-        description = None
-        try:
-            metadata = youtube_parser.extract_metadata(normalized_url)
-            title = metadata.get('title')
-            description = metadata.get('description')
-            logger.info(f"✅ Extracted metadata for {normalized_url}")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not extract metadata for {normalized_url}: {str(e)}")
-            # Continue without metadata - we can still create the URL entry
-            # This graceful degradation ensures system keeps working even if metadata fails
-        
-        # Create URL entry in database
-        try:
-            url_record = await db.create_youtube_url(
-                url=normalized_url,
-                url_type=url_type,
-                title=title,
-                description=description
-            )
-            logger.info(f"✅ Created URL record: {url_record.id}")
-        except Exception as e:
-            logger.error(f"❌ Database error creating URL: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        
-        # Create scraping job
-        try:
-            job_record = await db.create_scraping_job(url_record.id)
-            logger.info(f"✅ Created job record: {job_record.id}")
-        except Exception as e:
-            logger.error(f"❌ Database error creating job: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        
-        # Start background scraping task (if available)
-        task_id = None
-        if scrape_task:
+            
+            # Validate and parse the URL
             try:
-                task = scrape_task.delay(
-                    str(job_record.id),
-                    normalized_url,
-                    url_type.value
-                )
-                task_id = task.id
-                logger.info(f"✅ Started background task: {task_id}")
+                url_type, identifier = parse_youtube_url(url_data.url)
+                normalized_url = youtube_parser.normalize_url(url_data.url)
             except Exception as e:
-                logger.warning(f"⚠️ Could not start background task: {str(e)}")
-                # Continue without background processing
+                raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {str(e)}")
+            
+            # Extract basic metadata using yt-dlp (NO YouTube API needed)
+            # IMPORTANT: This uses web scraping, not API calls
+            # Benefits: No API keys, no rate limits, works with private videos
+            title = None
+            description = None
+            try:
+                metadata = youtube_parser.extract_metadata(normalized_url)
+                title = metadata.get('title')
+                description = metadata.get('description')
+                logger.info(f"✅ Extracted metadata for {normalized_url}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not extract metadata for {normalized_url}: {str(e)}")
+                # Continue without metadata - we can still create the URL entry
+                # This graceful degradation ensures system keeps working even if metadata fails
+            
+            # Create URL entry in database
+            try:
+                url_record = await db.create_youtube_url(
+                    url=normalized_url,
+                    url_type=url_type,
+                    title=title,
+                    description=description
+                )
+                logger.info(f"✅ Created URL record: {url_record.id}")
+            except Exception as e:
+                logger.error(f"❌ Database error creating URL: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+            # Create scraping job
+            try:
+                job_record = await db.create_scraping_job(url_record.id)
+                logger.info(f"✅ Created job record: {job_record.id}")
+            except Exception as e:
+                logger.error(f"❌ Database error creating job: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+            # Start background scraping task (if available)
+            task_id = None
+            if scrape_task:
+                try:
+                    task = scrape_task.delay(
+                        str(job_record.id),
+                        normalized_url,
+                        url_type.value
+                    )
+                    task_id = task.id
+                    logger.info(f"✅ Started background task: {task_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not start background task: {str(e)}")
+                    # Continue without background processing
+            
+            return {
+                "success": True,
+                "message": "URL submitted successfully",
+                "url_id": str(url_record.id),
+                "job_id": str(job_record.id),
+                "task_id": task_id,
+                "url_type": url_type.value,
+                "title": title,
+                "background_processing": task_id is not None
+            }
         
-        return {
-            "success": True,
-            "message": "URL submitted successfully",
-            "url_id": str(url_record.id),
-            "job_id": str(job_record.id),
-            "task_id": task_id,
-            "url_type": url_type.value,
-            "title": title,
-            "background_processing": task_id is not None
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/api/urls", response_model=List[YouTubeURLResponse])
 async def list_urls(limit: int = 50, offset: int = 0):
