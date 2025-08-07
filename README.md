@@ -439,12 +439,19 @@ This comprehensive testing approach ensures your system works correctly before p
 
 ### **🗄️ Setting Up Supabase Database**
 
-**Method 1: Complete Script (Recommended)**
+**Method 1: New Installation (Complete Schema)**
 1. Go to your Supabase project → SQL Editor
 2. Copy the **entire** contents of `database/schema.sql`
 3. Paste and run as **one complete script**
 
-**Method 2: Step-by-Step (If Method 1 fails)**
+**Method 2: Existing Videos Table (Migration)**
+If you already have a `videos` table:
+1. Use `database/migration_existing_videos.sql` instead
+2. This adds missing columns to your existing table
+3. Creates new tables: `youtube_urls`, `scraping_jobs`, `url_videos`
+4. **Safe**: Won't overwrite your existing video data
+
+**Method 3: Step-by-Step (If other methods fail)**
 1. Use `database/schema_step_by_step.sql`
 2. Copy and paste each STEP block one at a time
 3. **IMPORTANT**: Run STEP 1 (enums) first, then the rest
