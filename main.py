@@ -152,9 +152,26 @@ async def home(request: Request):
 
 @app.post("/api/urls", response_model=dict)
 async def submit_url(url_data: YouTubeURLCreate, request: Request):
-    """Submit a YouTube URL for scraping"""
+    """
+    Submit a YouTube URL for scraping
+    
+    PROCESSING FLOW:
+    1. Rate limiting check (10/minute per IP)
+    2. URL validation and parsing
+    3. Metadata extraction (yt-dlp, no API needed)
+    4. Database entry (immediate - user gets confirmation)
+    5. Background job creation (queued processing)
+    6. Return response (user can monitor progress)
+    
+    HIGH VOLUME HANDLING:
+    - URLs saved immediately to database
+    - Actual video processing happens asynchronously
+    - Rate limiting prevents system overload
+    - Graceful degradation if components unavailable
+    """
     try:
         # Check rate limits and system capacity
+        # IMPORTANT: This prevents system overload during high traffic
         try:
             from rate_limiter import check_request_limits, queue_manager
             await check_request_limits(request, 'submit_url')
@@ -181,7 +198,9 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {str(e)}")
         
-        # Extract basic metadata (this might fail, but we'll continue)
+        # Extract basic metadata using yt-dlp (NO YouTube API needed)
+        # IMPORTANT: This uses web scraping, not API calls
+        # Benefits: No API keys, no rate limits, works with private videos
         title = None
         description = None
         try:
@@ -192,6 +211,7 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
         except Exception as e:
             logger.warning(f"⚠️ Could not extract metadata for {normalized_url}: {str(e)}")
             # Continue without metadata - we can still create the URL entry
+            # This graceful degradation ensures system keeps working even if metadata fails
         
         # Create URL entry in database
         try:

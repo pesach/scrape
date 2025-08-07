@@ -17,6 +17,20 @@ def scrape_youtube_url_task(self, job_id: str, url: str, url_type: str):
     """
     Background task to scrape videos from a YouTube URL
     
+    IMPORTANT: This is the core background processing task
+    - Runs asynchronously after user submits URL
+    - Downloads videos in highest available quality
+    - Uploads to Backblaze B2 cloud storage
+    - Saves metadata to Supabase database
+    - Automatically cleans up local files
+    - Updates job status for user monitoring
+    
+    PROCESSING STRATEGY:
+    - Single videos: Process immediately
+    - Playlists/channels: Process each video with 1s delay
+    - Error handling: Continue processing other videos if one fails
+    - Rate limiting: Built-in delays to prevent YouTube blocking
+    
     Args:
         job_id: UUID of the scraping job
         url: YouTube URL to scrape

@@ -5,7 +5,23 @@ from models import URLType
 import yt_dlp
 
 class YouTubeURLParser:
-    """Parser and validator for YouTube URLs"""
+    """
+    Parser and validator for YouTube URLs
+    
+    METADATA EXTRACTION STRATEGY:
+    - Uses yt-dlp for web scraping (NOT YouTube API)
+    - No API keys or authentication required
+    - No rate limiting from YouTube API
+    - Can access more metadata than API provides
+    - Works with private/unlisted videos if accessible
+    - More reliable than API for bulk operations
+    
+    SUPPORTED URL TYPES:
+    - Single videos: youtube.com/watch?v=ID, youtu.be/ID
+    - Channels: youtube.com/channel/ID, youtube.com/@handle
+    - Playlists: youtube.com/playlist?list=ID
+    - User pages: youtube.com/user/USERNAME
+    """
     
     # Regular expressions for different YouTube URL patterns
     PATTERNS = {

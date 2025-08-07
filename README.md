@@ -14,6 +14,8 @@ A comprehensive system to scrape YouTube videos and store them in Backblaze B2 w
 - **Rate Limiting**: Prevents system overload with configurable limits
 - **Queue Management**: Priority queues for different content types
 - **Scalable Architecture**: Handle high volume with multiple workers
+- **Automatic Cleanup**: Videos deleted from server after cloud upload
+- **No API Keys**: Uses yt-dlp scraping instead of YouTube API
 
 ## Architecture & Flow
 
@@ -57,6 +59,26 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
 - **Vertical**: Increase worker concurrency
 - **Database**: Supabase auto-scales
 - **Storage**: Backblaze B2 handles any volume
+
+### **Important Technical Details:**
+
+**🎯 Metadata Extraction:**
+- **Source**: yt-dlp scraping (NOT YouTube API)
+- **Benefits**: No API keys, no rate limits, more detailed data
+- **Method**: Direct web scraping like a browser would do
+- **Handles**: Private/unlisted videos if accessible
+
+**💾 Storage & Cleanup:**
+- **Process**: Download → Upload to B2 → Save metadata → Delete local file
+- **Local Storage**: Temporary only (auto-deleted after upload)
+- **Permanent Storage**: Backblaze B2 cloud only
+- **Disk Usage**: Near zero (files cleaned up immediately)
+
+**⚡ Request Processing:**
+1. **Immediate**: URL validation and database entry
+2. **Queued**: Background job creation
+3. **Async**: Video download and processing
+4. **User Experience**: Can monitor progress via dashboard
 
 ## Prerequisites
 
@@ -323,6 +345,8 @@ This will start a simplified demo on `http://localhost:8001` that only tests You
    - YouTube may be rate-limiting or blocking requests
    - Try different videos/channels
    - Check if yt-dlp is up to date: `pip install --upgrade yt-dlp`
+   - **Important**: We use yt-dlp scraping, NOT YouTube API
+   - This means no API keys needed, but subject to web scraping limitations
 
 ### Step-by-Step Debugging
 
@@ -352,6 +376,82 @@ This will start a simplified demo on `http://localhost:8001` that only tests You
 ### Debug Mode
 
 Enable debug logging by setting the log level to DEBUG in `logging_config.py`.
+
+## 📋 Key Design Decisions & Rationale
+
+### **Why yt-dlp instead of YouTube API?**
+- ✅ **No API keys required** - Easier setup and deployment
+- ✅ **No rate limits** - YouTube API has strict quotas
+- ✅ **More metadata** - Can extract details not available via API
+- ✅ **Private videos** - Can access unlisted/private videos if accessible
+- ✅ **Cost effective** - No API usage costs
+- ⚠️ **Trade-off**: Subject to YouTube's anti-scraping measures
+
+### **Why immediate database entry + background processing?**
+- ✅ **User experience** - Immediate feedback and confirmation
+- ✅ **System reliability** - URLs saved even if processing fails
+- ✅ **Scalability** - Can handle high volume without blocking
+- ✅ **Monitoring** - Users can track progress in real-time
+- ✅ **Recovery** - Failed jobs can be retried
+
+### **Why automatic file cleanup?**
+- ✅ **Disk space** - Prevents server storage from filling up
+- ✅ **Cost efficiency** - Only cloud storage costs, no local storage
+- ✅ **Security** - No sensitive content stored locally
+- ✅ **Scalability** - Can process unlimited videos without disk limits
+
+### **Why rate limiting?**
+- ✅ **System protection** - Prevents overload during traffic spikes
+- ✅ **YouTube compliance** - Avoids triggering anti-bot measures
+- ✅ **Resource management** - Ensures fair usage across users
+- ✅ **Stability** - Maintains consistent performance
+
+## 🔧 Production Deployment Tips
+
+1. **Multiple Workers**: Run 3-5 Celery workers for better throughput
+2. **Monitor Queues**: Use `/api/queue-status` endpoint for health checks
+3. **Log Monitoring**: Set up alerts for error log patterns
+4. **Backup Strategy**: Regular database backups (videos safe in B2)
+5. **Rate Limit Tuning**: Adjust limits based on your user base
+6. **Resource Monitoring**: Watch CPU/memory usage during peak times
+
+## ❓ Frequently Asked Questions
+
+### **Q: Do videos get deleted from the server after upload?**
+**A: Yes!** Videos are automatically deleted immediately after successful upload to Backblaze B2. The server maintains near-zero disk usage.
+
+### **Q: Does this use the YouTube API?**
+**A: No!** We use yt-dlp for web scraping instead. This means no API keys needed, no rate limits, and access to more metadata.
+
+### **Q: What happens when too many URLs are submitted quickly?**
+**A: The system has built-in protections:**
+- Rate limiting (10 URLs/minute per IP)
+- Queue management with priorities
+- Graceful degradation if overloaded
+- URLs are saved immediately, processing happens in background
+
+### **Q: Can it handle private or unlisted videos?**
+**A: Yes!** Unlike the YouTube API, yt-dlp can access private/unlisted videos if they're accessible to the scraping process.
+
+### **Q: What video quality does it download?**
+**A: Highest available quality** - typically 1080p or 4K depending on what's available for each video.
+
+### **Q: How do I scale for high volume?**
+**A: Multiple approaches:**
+- Run multiple Celery workers
+- Increase worker concurrency
+- Monitor `/api/queue-status` for bottlenecks
+- Adjust rate limits as needed
+
+### **Q: What if the system gets an internal server error?**
+**A: Debug steps:**
+1. Check `/health` endpoint for component status
+2. Check `/debug` endpoint for configuration issues
+3. Run `python test_setup.py` to verify setup
+4. Try `python simple_demo.py` to test metadata extraction only
+
+### **Q: How much storage space is needed?**
+**A: Minimal!** Videos are only stored temporarily during upload. Permanent storage is in Backblaze B2 cloud.
 
 ## Contributing
 

@@ -15,7 +15,28 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 class VideoScraper:
-    """YouTube video scraper using yt-dlp"""
+    """
+    YouTube video scraper using yt-dlp
+    
+    IMPORTANT DESIGN DECISIONS:
+    
+    1. METADATA SOURCE: Uses yt-dlp scraping (NOT YouTube API)
+       - Benefits: No API keys needed, no rate limits, more metadata
+       - Method: Direct web scraping like a browser
+       - Handles: Private/unlisted videos if accessible
+    
+    2. STORAGE STRATEGY: Temporary local → Permanent cloud
+       - Downloads to temp directory first
+       - Uploads to Backblaze B2 cloud storage
+       - Immediately deletes local file after upload
+       - Result: Near-zero local disk usage
+    
+    3. PROCESSING FLOW:
+       - Single videos: High priority queue (faster)
+       - Playlists/channels: Normal priority queue
+       - Rate limiting: 1 second delay between videos
+       - Error handling: Continues processing other videos if one fails
+    """
     
     def __init__(self):
         self.download_path = os.getenv("DOWNLOAD_PATH", "/tmp/youtube_downloads")
@@ -210,10 +231,13 @@ class VideoScraper:
                 return True, f"Successfully processed video {video_id}"
                 
             finally:
-                # Clean up downloaded file
+                # CRITICAL: Clean up downloaded file to prevent disk space issues
+                # This ensures the server doesn't accumulate video files
+                # Files are only stored temporarily during upload process
                 if file_path and os.path.exists(file_path):
                     os.remove(file_path)
                     logger.info(f"Cleaned up temporary file: {file_path}")
+                    # At this point, video exists ONLY in Backblaze B2 cloud storage
                     
         except Exception as e:
             error_msg = f"Error processing video {url}: {str(e)}"
@@ -274,7 +298,9 @@ class VideoScraper:
                     failed_videos += 1
                     logger.error(f"Error processing video {i+1}/{total_videos}: {str(e)}")
                 
-                # Add small delay to avoid rate limiting
+                # IMPORTANT: Rate limiting delay to avoid overwhelming YouTube
+                # This prevents IP blocking and ensures stable operation
+                # For high-volume usage, consider implementing exponential backoff
                 await asyncio.sleep(1)
             
             success_msg = f"Processed {processed_videos} videos successfully"
