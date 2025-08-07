@@ -136,7 +136,9 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
 
 You can configure the application in two ways:
 
-### **Option 1: GitHub Repository Secrets (Recommended for Production)**
+### **Option 1: GitHub Repository Secrets (For GitHub Actions Only)**
+
+**⚠️ Important:** GitHub Secrets only work in GitHub Actions workflows, not locally or on servers!
 
 1. **Go to your GitHub repository**
 2. **Settings → Secrets and variables → Actions → New repository secret**
@@ -439,6 +441,7 @@ This comprehensive testing approach ensures your system works correctly before p
 
 📖 **For detailed testing instructions, see [TESTING.md](TESTING.md)**
 📖 **For server deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+🔐 **For GitHub Secrets troubleshooting, see [GITHUB_SECRETS_TROUBLESHOOTING.md](GITHUB_SECRETS_TROUBLESHOOTING.md)**
 
 ## Database Schema
 
