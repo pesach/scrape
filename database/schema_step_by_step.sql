@@ -1,38 +1,27 @@
--- YouTube Video Scraper Database Schema
--- =====================================
--- This script creates all necessary tables, enums, indexes, and triggers
--- for the YouTube Video Scraper application.
+-- YouTube Video Scraper Database Schema - Step by Step
+-- =====================================================
+-- If the main schema.sql fails, run these commands one by one in Supabase SQL Editor
 --
--- IMPORTANT: Run this entire script as one transaction in Supabase SQL Editor
--- Do NOT run individual statements separately!
+-- STEP 1: Create the enums first (MOST IMPORTANT!)
+-- Copy and paste this entire block:
 
--- Start transaction
-BEGIN;
-
--- Drop existing types and tables if they exist (for clean reinstall)
--- Uncomment these lines if you need to reset the database:
--- DROP TABLE IF EXISTS url_videos CASCADE;
--- DROP TABLE IF EXISTS scraping_jobs CASCADE;
--- DROP TABLE IF EXISTS videos CASCADE;
--- DROP TABLE IF EXISTS youtube_urls CASCADE;
--- DROP TYPE IF EXISTS job_status CASCADE;
--- DROP TYPE IF EXISTS url_type CASCADE;
-
--- Create enum for URL types
 DO $$ BEGIN
     CREATE TYPE url_type AS ENUM ('video', 'channel', 'playlist', 'user');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object THEN 
+        RAISE NOTICE 'Type url_type already exists, skipping';
 END $$;
 
--- Create enum for job status
 DO $$ BEGIN
     CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object THEN 
+        RAISE NOTICE 'Type job_status already exists, skipping';
 END $$;
 
--- Create table for YouTube URLs submitted by users
+-- STEP 2: Create youtube_urls table
+-- Copy and paste this:
+
 CREATE TABLE IF NOT EXISTS youtube_urls (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     url TEXT NOT NULL,
@@ -44,14 +33,16 @@ CREATE TABLE IF NOT EXISTS youtube_urls (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create table for individual videos
+-- STEP 3: Create videos table
+-- Copy and paste this:
+
 CREATE TABLE IF NOT EXISTS videos (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     youtube_id TEXT UNIQUE NOT NULL,
     url TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
-    duration INTEGER, -- in seconds
+    duration INTEGER,
     view_count BIGINT,
     like_count BIGINT,
     upload_date DATE,
@@ -62,15 +53,17 @@ CREATE TABLE IF NOT EXISTS videos (
     categories TEXT[],
     resolution TEXT,
     fps INTEGER,
-    file_size BIGINT, -- in bytes
+    file_size BIGINT,
     format_id TEXT,
-    b2_file_key TEXT, -- key in Backblaze B2
-    b2_file_url TEXT, -- public URL in B2
+    b2_file_key TEXT,
+    b2_file_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create table for scraping jobs
+-- STEP 4: Create scraping_jobs table
+-- Copy and paste this:
+
 CREATE TABLE IF NOT EXISTS scraping_jobs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     youtube_url_id UUID REFERENCES youtube_urls(id) ON DELETE CASCADE,
@@ -83,7 +76,9 @@ CREATE TABLE IF NOT EXISTS scraping_jobs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create junction table for many-to-many relationship between URLs and videos
+-- STEP 5: Create url_videos junction table
+-- Copy and paste this:
+
 CREATE TABLE IF NOT EXISTS url_videos (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     youtube_url_id UUID REFERENCES youtube_urls(id) ON DELETE CASCADE,
@@ -92,7 +87,9 @@ CREATE TABLE IF NOT EXISTS url_videos (
     UNIQUE(youtube_url_id, video_id)
 );
 
--- Create indexes for better performance
+-- STEP 6: Create indexes for performance
+-- Copy and paste this:
+
 CREATE INDEX IF NOT EXISTS idx_youtube_urls_url_type ON youtube_urls(url_type);
 CREATE INDEX IF NOT EXISTS idx_youtube_urls_submitted_at ON youtube_urls(submitted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_youtube_id ON videos(youtube_id);
@@ -103,7 +100,9 @@ CREATE INDEX IF NOT EXISTS idx_scraping_jobs_youtube_url_id ON scraping_jobs(you
 CREATE INDEX IF NOT EXISTS idx_url_videos_youtube_url_id ON url_videos(youtube_url_id);
 CREATE INDEX IF NOT EXISTS idx_url_videos_video_id ON url_videos(video_id);
 
--- Create function to update updated_at timestamp
+-- STEP 7: Create update trigger function
+-- Copy and paste this:
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -112,23 +111,35 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers to automatically update updated_at timestamp
-CREATE TRIGGER update_youtube_urls_updated_at BEFORE UPDATE ON youtube_urls
+-- STEP 8: Create triggers
+-- Copy and paste this:
+
+DROP TRIGGER IF EXISTS update_youtube_urls_updated_at ON youtube_urls;
+CREATE TRIGGER update_youtube_urls_updated_at 
+    BEFORE UPDATE ON youtube_urls
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_videos_updated_at BEFORE UPDATE ON videos
+DROP TRIGGER IF EXISTS update_videos_updated_at ON videos;
+CREATE TRIGGER update_videos_updated_at 
+    BEFORE UPDATE ON videos
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_scraping_jobs_updated_at BEFORE UPDATE ON scraping_jobs
+DROP TRIGGER IF EXISTS update_scraping_jobs_updated_at ON scraping_jobs;
+CREATE TRIGGER update_scraping_jobs_updated_at 
+    BEFORE UPDATE ON scraping_jobs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Commit transaction
-COMMIT;
+-- STEP 9: Verify everything was created
+-- Copy and paste this:
 
--- Verify the schema was created successfully
-SELECT 'Schema created successfully!' as status;
+SELECT 
+    'Tables created successfully!' as status,
+    COUNT(*) as table_count
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('youtube_urls', 'videos', 'scraping_jobs', 'url_videos');
 
--- Show created tables
+-- List all your tables
 SELECT table_name, table_type 
 FROM information_schema.tables 
 WHERE table_schema = 'public' 

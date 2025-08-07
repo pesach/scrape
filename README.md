@@ -437,6 +437,31 @@ This comprehensive testing approach ensures your system works correctly before p
 
 ## Database Schema
 
+### **🗄️ Setting Up Supabase Database**
+
+**Method 1: Complete Script (Recommended)**
+1. Go to your Supabase project → SQL Editor
+2. Copy the **entire** contents of `database/schema.sql`
+3. Paste and run as **one complete script**
+
+**Method 2: Step-by-Step (If Method 1 fails)**
+1. Use `database/schema_step_by_step.sql`
+2. Copy and paste each STEP block one at a time
+3. **IMPORTANT**: Run STEP 1 (enums) first, then the rest
+
+**Common Issues:**
+- ❌ `type "job_status" does not exist` → You ran table creation before enum creation
+- ✅ **Solution**: Always run the enums first, or use the complete script
+
+**Verification:**
+After running the schema, you should see 4 tables:
+- `youtube_urls` - Submitted URLs
+- `videos` - Individual video metadata  
+- `scraping_jobs` - Background job tracking
+- `url_videos` - Links URLs to their videos
+
+### **📊 Database Tables**
+
 The system uses the following main tables:
 
 - **youtube_urls**: Stores submitted YouTube URLs
