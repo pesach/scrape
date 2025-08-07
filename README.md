@@ -439,33 +439,25 @@ This comprehensive testing approach ensures your system works correctly before p
 
 ### **🗄️ Setting Up Supabase Database**
 
-**Method 1: New Installation (Complete Schema)**
-1. Go to your Supabase project → SQL Editor
+**One Simple Script for Everyone! 🎯**
+
+1. Go to your **Supabase project → SQL Editor**
 2. Copy the **entire** contents of `database/schema.sql`
 3. Paste and run as **one complete script**
 
-**Method 2: Existing Videos Table (Migration)**
-If you already have a `videos` table:
-1. Use `database/migration_existing_videos.sql` instead
-2. This adds missing columns to your existing table
-3. Creates new tables: `youtube_urls`, `scraping_jobs`, `url_videos`
-4. **Safe**: Won't overwrite your existing video data
+**What it does automatically:**
+- ✅ **New users**: Creates complete schema with all tables
+- ✅ **Existing videos table**: Safely adds missing columns, preserves your data
+- ✅ **Multiple runs**: Safe to run multiple times, won't break anything
+- ✅ **Smart detection**: Automatically detects your setup and adapts
 
-**Method 3: Step-by-Step (If other methods fail)**
-1. Use `database/schema_step_by_step.sql`
-2. Copy and paste each STEP block one at a time
-3. **IMPORTANT**: Run STEP 1 (enums) first, then the rest
+**Expected Result:**
+After running the script, you'll see:
+- 📊 **4 tables total**: `youtube_urls`, `videos`, `scraping_jobs`, `url_videos`
+- 🔄 **Migration messages**: Shows what was created/updated
+- ✅ **Success confirmation**: "Ready to start scraping YouTube videos!"
 
-**Common Issues:**
-- ❌ `type "job_status" does not exist` → You ran table creation before enum creation
-- ✅ **Solution**: Always run the enums first, or use the complete script
-
-**Verification:**
-After running the schema, you should see 4 tables:
-- `youtube_urls` - Submitted URLs
-- `videos` - Individual video metadata  
-- `scraping_jobs` - Background job tracking
-- `url_videos` - Links URLs to their videos
+**No more confusion about which script to use!** 🎉
 
 ### **📊 Database Tables**
 

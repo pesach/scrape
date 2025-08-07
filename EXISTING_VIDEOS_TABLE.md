@@ -11,10 +11,12 @@ Based on your existing `videos` table with columns:
 
 ## 🔧 **Migration Steps**
 
-### **Step 1: Run Migration Script**
+### **Step 1: Run the Schema Script**
 1. Go to **Supabase → SQL Editor**
-2. Copy and paste the contents of `database/migration_existing_videos.sql`
+2. Copy and paste the contents of `database/schema.sql`
 3. Run the script
+
+**The script automatically detects your existing `videos` table and runs in migration mode!**
 
 **What this does:**
 - ✅ Creates new tables: `youtube_urls`, `scraping_jobs`, `url_videos`
