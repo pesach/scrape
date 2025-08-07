@@ -14,3 +14,4 @@ requests==2.31.0
 sqlalchemy==2.0.23
 flask==3.0.0
 # Note: psycopg2-binary removed - Supabase client handles PostgreSQL connections internally
+# python-dotenv is included for .env file support
