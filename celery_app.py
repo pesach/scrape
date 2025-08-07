@@ -2,6 +2,13 @@ import os
 from celery import Celery
 from kombu import Queue
 
+# Load environment variables FIRST (same as test_setup.py)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # Fail silently for Celery worker
+
 # Create Celery instance
 celery_app = Celery('youtube_scraper')
 

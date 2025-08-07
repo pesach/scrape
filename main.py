@@ -9,6 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import traceback
 
+# Load environment variables FIRST (same as test_setup.py)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Loaded environment variables from .env file")
+except ImportError:
+    print("⚠️  python-dotenv not available, using system environment variables only")
+
 # Load configuration (handles both .env and environment variables)
 from config import config
 
