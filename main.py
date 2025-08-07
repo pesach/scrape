@@ -151,9 +151,23 @@ async def home(request: Request):
         raise HTTPException(status_code=500, detail=f"Template error: {str(e)}")
 
 @app.post("/api/urls", response_model=dict)
-async def submit_url(url_data: YouTubeURLCreate):
+async def submit_url(url_data: YouTubeURLCreate, request: Request):
     """Submit a YouTube URL for scraping"""
     try:
+        # Check rate limits and system capacity
+        try:
+            from rate_limiter import check_request_limits, queue_manager
+            await check_request_limits(request, 'submit_url')
+        except ImportError:
+            logger.warning("Rate limiter not available")
+        except HTTPException as e:
+            # Return rate limit error with helpful message
+            return JSONResponse(
+                status_code=e.status_code,
+                content=e.detail
+            )
+        
+        try:
         if not db:
             raise HTTPException(status_code=503, detail="Database not available")
         
@@ -393,6 +407,35 @@ async def debug_info():
     }
     
     return debug_data
+
+@app.get("/api/queue-status")
+async def queue_status():
+    """Get current queue status and system load"""
+    try:
+        from rate_limiter import queue_manager, load_monitor
+        
+        # Get queue statistics
+        queue_stats = await queue_manager.get_queue_stats()
+        
+        # Get system capacity
+        can_handle, message = await load_monitor.check_system_capacity()
+        
+        return {
+            "queue_stats": queue_stats,
+            "system_capacity": {
+                "can_handle_requests": can_handle,
+                "message": message
+            },
+            "rate_limits": {
+                "submit_url": "10 per minute",
+                "validate_url": "30 per minute", 
+                "dashboard": "60 per minute"
+            }
+        }
+    except ImportError:
+        return {"error": "Queue monitoring not available"}
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

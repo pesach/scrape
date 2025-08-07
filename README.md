@@ -11,9 +11,20 @@ A comprehensive system to scrape YouTube videos and store them in Backblaze B2 w
 - **Background Processing**: Uses Celery for asynchronous video processing
 - **Web Interface**: Clean web UI for URL submission and monitoring
 - **REST API**: Full API for programmatic access
+- **Rate Limiting**: Prevents system overload with configurable limits
+- **Queue Management**: Priority queues for different content types
+- **Scalable Architecture**: Handle high volume with multiple workers
 
-## Architecture
+## Architecture & Flow
 
+### **Request Flow:**
+```
+User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worker → Download → B2 Storage
+     ↓              ↓               ↓            ↓             ↓             ↓
+  Immediate      Immediate       Immediate    Queued      Background     Async Upload
+```
+
+### **System Components:**
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Web Interface │    │   FastAPI App   │    │   Celery Worker │
@@ -25,7 +36,27 @@ A comprehensive system to scrape YouTube videos and store them in Backblaze B2 w
                        │   Supabase DB   │    │  Backblaze B2   │
                        │   (Metadata)    │    │   (Videos)      │
                        └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Redis Queue   │
+                       │   (Job Queue)   │
+                       └─────────────────┘
 ```
+
+### **High Volume Handling:**
+
+**✅ Built-in Protections:**
+- **Rate Limiting**: 10 URLs/minute per IP
+- **Queue Management**: Priority queues (videos → high, playlists → normal)
+- **System Monitoring**: Automatic capacity checks
+- **Graceful Degradation**: Continues without background processing if needed
+
+**📊 Scaling Options:**
+- **Horizontal**: Multiple Celery workers
+- **Vertical**: Increase worker concurrency
+- **Database**: Supabase auto-scales
+- **Storage**: Backblaze B2 handles any volume
 
 ## Prerequisites
 
