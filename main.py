@@ -175,22 +175,21 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
     - Rate limiting prevents system overload
     - Graceful degradation if components unavailable
     """
+    # Check rate limits and system capacity
+    # IMPORTANT: This prevents system overload during high traffic
     try:
-        # Check rate limits and system capacity
-        # IMPORTANT: This prevents system overload during high traffic
-        try:
-            from rate_limiter import check_request_limits, queue_manager
-            await check_request_limits(request, 'submit_url')
-        except ImportError:
-            logger.warning("Rate limiter not available")
-        except HTTPException as e:
-            # Return rate limit error with helpful message
-            return JSONResponse(
-                status_code=e.status_code,
-                content=e.detail
-            )
-        
-        try:
+        from rate_limiter import check_request_limits, queue_manager
+        await check_request_limits(request, 'submit_url')
+    except ImportError:
+        logger.warning("Rate limiter not available")
+    except HTTPException as e:
+        # Return rate limit error with helpful message
+        return JSONResponse(
+            status_code=e.status_code,
+            content=e.detail
+        )
+    
+    try:
             if not db:
                 raise HTTPException(status_code=503, detail="Database not available")
             
@@ -266,12 +265,12 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
                 "background_processing": task_id is not None
             }
         
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/api/urls", response_model=List[YouTubeURLResponse])
 async def list_urls(limit: int = 50, offset: int = 0):
