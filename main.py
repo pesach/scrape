@@ -191,11 +191,11 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
             )
         
         try:
-        if not db:
-            raise HTTPException(status_code=503, detail="Database not available")
-        
-        if not youtube_parser:
-            raise HTTPException(status_code=503, detail="YouTube parser not available")
+            if not db:
+                raise HTTPException(status_code=503, detail="Database not available")
+            
+            if not youtube_parser:
+                raise HTTPException(status_code=503, detail="YouTube parser not available")
         
         # Validate and parse the URL
         try:
