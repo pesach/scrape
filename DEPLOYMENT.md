@@ -8,8 +8,8 @@ This guide covers deploying the YouTube Video Scraper to a server with automatic
 
 1. **Clone and run setup script:**
    ```bash
-   git clone https://github.com/yourusername/youtube-video-scraper.git
-   cd youtube-video-scraper
+   git clone https://github.com/pesach/scrape.git
+   cd scrape
    chmod +x deploy/setup_server.sh
    sudo ./deploy/setup_server.sh
    ```
@@ -79,8 +79,8 @@ sudo su - youtube-scraper
 
 ```bash
 # Clone your repository
-git clone https://github.com/yourusername/youtube-video-scraper.git
-cd youtube-video-scraper
+git clone https://github.com/pesach/scrape.git
+cd scrape
 
 # Create Python virtual environment
 python3 -m venv venv
@@ -136,10 +136,10 @@ After=network.target redis.service
 Type=simple
 User=youtube-scraper
 Group=youtube-scraper
-WorkingDirectory=/home/youtube-scraper/youtube-video-scraper
-Environment=PATH=/home/youtube-scraper/youtube-video-scraper/venv/bin
+WorkingDirectory=/home/youtube-scraper/scrape
+Environment=PATH=/home/youtube-scraper/scrape/venv/bin
 EnvironmentFile=/etc/environment
-ExecStart=/home/youtube-scraper/youtube-video-scraper/venv/bin/python run.py
+ExecStart=/home/youtube-scraper/scrape/venv/bin/python run.py
 Restart=always
 RestartSec=3
 
@@ -161,10 +161,10 @@ After=network.target redis.service
 Type=simple
 User=youtube-scraper
 Group=youtube-scraper
-WorkingDirectory=/home/youtube-scraper/youtube-video-scraper
-Environment=PATH=/home/youtube-scraper/youtube-video-scraper/venv/bin
+WorkingDirectory=/home/youtube-scraper/scrape
+Environment=PATH=/home/youtube-scraper/scrape/venv/bin
 EnvironmentFile=/etc/environment
-ExecStart=/home/youtube-scraper/youtube-video-scraper/venv/bin/python start_worker.py
+ExecStart=/home/youtube-scraper/scrape/venv/bin/python start_worker.py
 Restart=always
 RestartSec=3
 
@@ -193,7 +193,7 @@ server {
 
     # Optional: Serve static files directly
     location /static/ {
-        alias /home/youtube-scraper/youtube-video-scraper/static/;
+        alias /home/youtube-scraper/scrape/static/;
     }
 }
 ```
@@ -226,7 +226,7 @@ app = Flask(__name__)
 
 # Set this to your GitHub webhook secret
 WEBHOOK_SECRET = "your-webhook-secret-here"
-REPO_PATH = "/home/youtube-scraper/youtube-video-scraper"
+REPO_PATH = "/home/youtube-scraper/scrape"
 
 @app.route('/webhook', methods=['POST'])
 def github_webhook():
@@ -288,7 +288,7 @@ Type=simple
 User=youtube-scraper
 Group=youtube-scraper
 WorkingDirectory=/home/youtube-scraper
-ExecStart=/home/youtube-scraper/youtube-video-scraper/venv/bin/python webhook.py
+ExecStart=/home/youtube-scraper/scrape/venv/bin/python webhook.py
 Restart=always
 
 [Install]
@@ -314,7 +314,7 @@ crontab -e
 
 Add this line to check for updates every 5 minutes:
 ```bash
-*/5 * * * * cd /home/youtube-scraper/youtube-video-scraper && git fetch && [ $(git rev-list HEAD...origin/main --count) != 0 ] && git pull origin main && ./venv/bin/pip install -r requirements.txt && sudo systemctl restart youtube-scraper youtube-worker
+*/5 * * * * cd /home/youtube-scraper/scrape && git fetch && [ $(git rev-list HEAD...origin/main --count) != 0 ] && git pull origin main && ./venv/bin/pip install -r requirements.txt && sudo systemctl restart youtube-scraper youtube-worker
 ```
 
 ### **Method 3: Manual Update Script**
@@ -329,7 +329,7 @@ set -e
 
 echo "🔄 Updating YouTube Video Scraper..."
 
-cd /home/youtube-scraper/youtube-video-scraper
+cd /home/youtube-scraper/scrape
 
 # Pull latest code
 echo "📥 Pulling latest code from GitHub..."
@@ -365,8 +365,8 @@ chmod +x /home/youtube-scraper/update.sh
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/youtube-video-scraper.git
-cd youtube-video-scraper
+git clone https://github.com/pesach/scrape.git
+cd scrape
 
 # Create environment file
 nano .env
@@ -428,8 +428,8 @@ sudo chmod 600 /etc/environment
 sudo chown root:root /etc/environment
 
 # Secure application directory
-sudo chown -R youtube-scraper:youtube-scraper /home/youtube-scraper/youtube-video-scraper
-sudo chmod -R 755 /home/youtube-scraper/youtube-video-scraper
+sudo chown -R youtube-scraper:youtube-scraper /home/youtube-scraper/scrape
+sudo chmod -R 755 /home/youtube-scraper/scrape
 ```
 
 ## 📊 **Monitoring & Maintenance**
@@ -446,7 +446,7 @@ sudo journalctl -u youtube-scraper -f
 sudo journalctl -u youtube-worker -f
 
 # Check application logs
-tail -f /home/youtube-scraper/youtube-video-scraper/logs/youtube_scraper.log
+tail -f /home/youtube-scraper/scrape/logs/youtube_scraper.log
 ```
 
 ### **System Monitoring**
@@ -479,7 +479,7 @@ mkdir -p $BACKUP_DIR
 
 # Backup configuration
 cp /etc/environment $BACKUP_DIR/environment_$DATE
-cp -r /home/youtube-scraper/youtube-video-scraper $BACKUP_DIR/app_$DATE
+cp -r /home/youtube-scraper/scrape $BACKUP_DIR/app_$DATE
 
 # Keep only last 7 days of backups
 find $BACKUP_DIR -type f -mtime +7 -delete

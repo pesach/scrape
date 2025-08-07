@@ -201,8 +201,8 @@ heroku config:set SUPABASE_KEY=your_key
 ```bash
 # 1. Get a VPS (DigitalOcean, AWS, etc.)
 # 2. Run the automated setup script:
-git clone https://github.com/yourusername/youtube-video-scraper.git
-cd youtube-video-scraper
+git clone https://github.com/pesach/scrape.git
+cd scrape
 sudo ./deploy/setup_server.sh
 
 # 3. Configure your secrets:

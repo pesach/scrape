@@ -42,7 +42,7 @@ app = Flask(__name__)
 
 # Configuration
 WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'your-webhook-secret-here')
-REPO_PATH = "/home/youtube-scraper/youtube-video-scraper"
+REPO_PATH = "/home/youtube-scraper/scrape"
 ALLOWED_BRANCHES = ['refs/heads/main', 'refs/heads/master']
 
 @app.route('/webhook', methods=['POST'])

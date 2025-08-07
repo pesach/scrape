@@ -128,8 +128,8 @@ If you're having dependency issues, Docker is the easiest solution:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/youtube-video-scraper.git
-cd youtube-video-scraper
+git clone https://github.com/pesach/scrape.git
+cd scrape
 
 # Create environment file
 cp .env.example .env

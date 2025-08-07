@@ -10,8 +10,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 APP_USER="youtube-scraper"
-APP_DIR="/home/$APP_USER/youtube-video-scraper"
-REPO_URL="https://github.com/yourusername/youtube-video-scraper.git"
+APP_DIR="/home/$APP_USER/scrape"
+REPO_URL="https://github.com/pesach/scrape.git"
 
 echo -e "${BLUE}🚀 YouTube Video Scraper - Server Setup Script${NC}"
 echo -e "${BLUE}================================================${NC}"
@@ -224,7 +224,7 @@ set -e
 
 echo "🔄 Updating YouTube Video Scraper..."
 
-cd /home/youtube-scraper/youtube-video-scraper
+cd /home/youtube-scraper/scrape
 
 # Pull latest code
 echo "📥 Pulling latest code from GitHub..."
@@ -264,7 +264,7 @@ mkdir -p $BACKUP_DIR
 
 # Backup configuration
 cp /etc/environment $BACKUP_DIR/environment_$DATE 2>/dev/null || echo "No environment file to backup"
-cp -r /home/youtube-scraper/youtube-video-scraper $BACKUP_DIR/app_$DATE
+cp -r /home/youtube-scraper/scrape $BACKUP_DIR/app_$DATE
 
 # Keep only last 7 days of backups
 find $BACKUP_DIR -type d -name "app_*" -mtime +7 -exec rm -rf {} + 2>/dev/null || true
