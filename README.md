@@ -242,13 +242,81 @@ The system includes comprehensive error handling:
 
 ## Troubleshooting
 
+### Quick Test
+
+First, test if metadata extraction works:
+
+```bash
+python simple_demo.py
+```
+
+This will start a simplified demo on `http://localhost:8001` that only tests YouTube metadata extraction without external dependencies.
+
 ### Common Issues
 
-1. **"yt-dlp not found"**: Install yt-dlp with `pip install yt-dlp`
-2. **"FFmpeg not found"**: Install FFmpeg for your operating system
-3. **Redis connection error**: Ensure Redis is running on the configured port
-4. **Supabase connection error**: Check your URL and API key
-5. **B2 upload error**: Verify your application key and bucket permissions
+1. **Internal Server Error**
+   - Check `/health` endpoint: `http://localhost:8000/health`
+   - Check `/debug` endpoint: `http://localhost:8000/debug`
+   - Look at logs in `logs/youtube_scraper.log`
+
+2. **"yt-dlp not found"**: 
+   ```bash
+   pip install yt-dlp
+   ```
+
+3. **"FFmpeg not found"**: Install FFmpeg for your operating system
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install ffmpeg
+   
+   # macOS
+   brew install ffmpeg
+   ```
+
+4. **Database connection error**: 
+   - Ensure Supabase credentials are correct in `.env`
+   - Run the database schema in Supabase SQL editor
+   - Check network connectivity to Supabase
+
+5. **Redis connection error**: 
+   ```bash
+   # Install and start Redis
+   sudo apt install redis-server
+   sudo systemctl start redis-server
+   
+   # Test Redis connection
+   redis-cli ping
+   ```
+
+6. **Metadata extraction fails**:
+   - YouTube may be rate-limiting or blocking requests
+   - Try different videos/channels
+   - Check if yt-dlp is up to date: `pip install --upgrade yt-dlp`
+
+### Step-by-Step Debugging
+
+1. **Test setup verification**:
+   ```bash
+   python test_setup.py
+   ```
+
+2. **Test metadata extraction only**:
+   ```bash
+   python simple_demo.py
+   # Open http://localhost:8001
+   ```
+
+3. **Check component health**:
+   ```bash
+   curl http://localhost:8000/health
+   curl http://localhost:8000/debug
+   ```
+
+4. **Check logs**:
+   ```bash
+   tail -f logs/youtube_scraper.log
+   tail -f logs/errors.log
+   ```
 
 ### Debug Mode
 

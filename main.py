@@ -5,102 +5,256 @@ from fastapi import FastAPI, HTTPException, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import uuid
+import traceback
+
+# Load environment variables first
+from dotenv import load_dotenv
+load_dotenv()
+
+# Setup logging
+from logging_config import setup_logging
+setup_logging()
 
 from models import (
     YouTubeURLCreate, YouTubeURLResponse, ScrapingJobResponse, 
     VideoResponse, URLType, JobStatus
 )
-from database import db
-from youtube_parser import YouTubeURLParser, parse_youtube_url
-from tasks import scrape_youtube_url_task, extract_url_metadata_task
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with better error handling
 app = FastAPI(
     title="YouTube Video Scraper",
     description="A system to scrape YouTube videos and store them in Backblaze B2 with metadata in Supabase",
-    version="1.0.0"
+    version="1.0.0",
+    debug=True  # Enable debug mode for better error messages
 )
 
-# Setup templates and static files
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Setup templates
 templates = Jinja2Templates(directory="templates")
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception: {str(exc)}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "message": str(exc),
+            "type": type(exc).__name__
+        }
+    )
+
+# Initialize database and other components with error handling
+db = None
+try:
+    from database import db as database_instance
+    db = database_instance
+    logger.info("✅ Database connection initialized")
+except Exception as e:
+    logger.error(f"❌ Database initialization failed: {str(e)}")
+    db = None
+
+# Initialize YouTube parser
+youtube_parser = None
+try:
+    from youtube_parser import YouTubeURLParser, parse_youtube_url
+    youtube_parser = YouTubeURLParser
+    logger.info("✅ YouTube parser initialized")
+except Exception as e:
+    logger.error(f"❌ YouTube parser initialization failed: {str(e)}")
+
+# Initialize tasks (optional - may fail if Celery/Redis not available)
+scrape_task = None
+try:
+    from tasks import scrape_youtube_url_task, extract_url_metadata_task
+    scrape_task = scrape_youtube_url_task
+    logger.info("✅ Celery tasks initialized")
+except Exception as e:
+    logger.warning(f"⚠️ Celery tasks not available: {str(e)}")
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Comprehensive health check"""
+    status = {
+        "status": "healthy",
+        "components": {
+            "database": "unknown",
+            "youtube_parser": "unknown", 
+            "celery": "unknown",
+            "environment": "unknown"
+        }
+    }
+    
+    # Check database
+    if db:
+        try:
+            # Try a simple database operation
+            await db.get_youtube_urls(limit=1)
+            status["components"]["database"] = "healthy"
+        except Exception as e:
+            status["components"]["database"] = f"error: {str(e)}"
+            status["status"] = "degraded"
+    else:
+        status["components"]["database"] = "not initialized"
+        status["status"] = "degraded"
+    
+    # Check YouTube parser
+    if youtube_parser:
+        try:
+            youtube_parser.validate_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            status["components"]["youtube_parser"] = "healthy"
+        except Exception as e:
+            status["components"]["youtube_parser"] = f"error: {str(e)}"
+    else:
+        status["components"]["youtube_parser"] = "not initialized"
+        status["status"] = "degraded"
+    
+    # Check Celery
+    status["components"]["celery"] = "available" if scrape_task else "not available"
+    
+    # Check environment variables
+    required_vars = ["SUPABASE_URL", "SUPABASE_KEY", "B2_APPLICATION_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_NAME"]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        status["components"]["environment"] = f"missing variables: {', '.join(missing_vars)}"
+        status["status"] = "degraded"
+    else:
+        status["components"]["environment"] = "configured"
+    
+    return status
 
 # API Routes
 @app.get("/")
 async def home(request: Request):
     """Home page with URL submission form"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error rendering home page: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Template error: {str(e)}")
 
 @app.post("/api/urls", response_model=dict)
 async def submit_url(url_data: YouTubeURLCreate):
     """Submit a YouTube URL for scraping"""
     try:
-        # Validate and parse the URL
-        url_type, identifier = parse_youtube_url(url_data.url)
-        normalized_url = YouTubeURLParser.normalize_url(url_data.url)
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
         
-        # Extract basic metadata
+        if not youtube_parser:
+            raise HTTPException(status_code=503, detail="YouTube parser not available")
+        
+        # Validate and parse the URL
         try:
-            metadata = YouTubeURLParser.extract_metadata(normalized_url)
+            url_type, identifier = parse_youtube_url(url_data.url)
+            normalized_url = youtube_parser.normalize_url(url_data.url)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {str(e)}")
+        
+        # Extract basic metadata (this might fail, but we'll continue)
+        title = None
+        description = None
+        try:
+            metadata = youtube_parser.extract_metadata(normalized_url)
             title = metadata.get('title')
             description = metadata.get('description')
+            logger.info(f"✅ Extracted metadata for {normalized_url}")
         except Exception as e:
-            logger.warning(f"Could not extract metadata for {normalized_url}: {str(e)}")
-            title = None
-            description = None
+            logger.warning(f"⚠️ Could not extract metadata for {normalized_url}: {str(e)}")
+            # Continue without metadata - we can still create the URL entry
         
         # Create URL entry in database
-        url_record = await db.create_youtube_url(
-            url=normalized_url,
-            url_type=url_type,
-            title=title,
-            description=description
-        )
+        try:
+            url_record = await db.create_youtube_url(
+                url=normalized_url,
+                url_type=url_type,
+                title=title,
+                description=description
+            )
+            logger.info(f"✅ Created URL record: {url_record.id}")
+        except Exception as e:
+            logger.error(f"❌ Database error creating URL: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         
         # Create scraping job
-        job_record = await db.create_scraping_job(url_record.id)
+        try:
+            job_record = await db.create_scraping_job(url_record.id)
+            logger.info(f"✅ Created job record: {job_record.id}")
+        except Exception as e:
+            logger.error(f"❌ Database error creating job: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         
-        # Start background scraping task
-        task = scrape_youtube_url_task.delay(
-            str(job_record.id),
-            normalized_url,
-            url_type.value
-        )
+        # Start background scraping task (if available)
+        task_id = None
+        if scrape_task:
+            try:
+                task = scrape_task.delay(
+                    str(job_record.id),
+                    normalized_url,
+                    url_type.value
+                )
+                task_id = task.id
+                logger.info(f"✅ Started background task: {task_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not start background task: {str(e)}")
+                # Continue without background processing
         
         return {
             "success": True,
             "message": "URL submitted successfully",
             "url_id": str(url_record.id),
             "job_id": str(job_record.id),
-            "task_id": task.id,
+            "task_id": task_id,
             "url_type": url_type.value,
-            "title": title
+            "title": title,
+            "background_processing": task_id is not None
         }
         
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error submitting URL: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/api/urls", response_model=List[YouTubeURLResponse])
 async def list_urls(limit: int = 50, offset: int = 0):
     """List all submitted YouTube URLs"""
     try:
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
         urls = await db.get_youtube_urls(limit=limit, offset=offset)
         return urls
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing URLs: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/urls/{url_id}", response_model=YouTubeURLResponse)
 async def get_url(url_id: str):
     """Get a specific YouTube URL by ID"""
     try:
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
         url_uuid = uuid.UUID(url_id)
         url_record = await db.get_youtube_url(url_uuid)
         if not url_record:
@@ -108,27 +262,37 @@ async def get_url(url_id: str):
         return url_record
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid URL ID format")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting URL: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/urls/{url_id}/videos", response_model=List[VideoResponse])
 async def get_url_videos(url_id: str):
     """Get all videos for a specific YouTube URL"""
     try:
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
         url_uuid = uuid.UUID(url_id)
         videos = await db.get_videos_by_url(url_uuid)
         return videos
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid URL ID format")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting videos: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/jobs/{job_id}", response_model=ScrapingJobResponse)
 async def get_job_status(job_id: str):
     """Get the status of a scraping job"""
     try:
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
         job_uuid = uuid.UUID(job_id)
         job = await db.get_scraping_job(job_uuid)
         if not job:
@@ -136,26 +300,21 @@ async def get_job_status(job_id: str):
         return job
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job ID format")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting job status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.get("/api/jobs", response_model=List[ScrapingJobResponse])
-async def list_jobs():
-    """List all scraping jobs"""
-    try:
-        jobs = await db.get_pending_jobs()
-        return jobs
-    except Exception as e:
-        logger.error(f"Error listing jobs: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.post("/api/validate-url")
 async def validate_url(url_data: YouTubeURLCreate):
     """Validate a YouTube URL without submitting it"""
     try:
+        if not youtube_parser:
+            raise HTTPException(status_code=503, detail="YouTube parser not available")
+        
         url_type, identifier = parse_youtube_url(url_data.url)
-        normalized_url = YouTubeURLParser.normalize_url(url_data.url)
+        normalized_url = youtube_parser.normalize_url(url_data.url)
         
         return {
             "valid": True,
@@ -168,21 +327,30 @@ async def validate_url(url_data: YouTubeURLCreate):
             "valid": False,
             "error": str(e)
         }
+    except Exception as e:
+        logger.error(f"Error validating URL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
 
 @app.get("/dashboard")
 async def dashboard(request: Request):
     """Dashboard page showing submitted URLs and their status"""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    try:
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error rendering dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Template error: {str(e)}")
 
 @app.get("/api/dashboard-data")
 async def dashboard_data():
     """Get dashboard data (URLs, jobs, statistics)"""
     try:
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
         # Get recent URLs
         urls = await db.get_youtube_urls(limit=20)
         
-        # Get job statistics
-        # This would need more database methods to get proper statistics
+        # Get job statistics (simplified for now)
         stats = {
             "total_urls": len(urls),
             "pending_jobs": 0,
@@ -195,16 +363,37 @@ async def dashboard_data():
             "urls": [url.dict() for url in urls],
             "stats": stats
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting dashboard data: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Dashboard error: {str(e)}")
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
+# Debug endpoint to check what's wrong
+@app.get("/debug")
+async def debug_info():
+    """Debug information endpoint"""
+    debug_data = {
+        "environment_variables": {
+            "SUPABASE_URL": "✅" if os.getenv("SUPABASE_URL") else "❌",
+            "SUPABASE_KEY": "✅" if os.getenv("SUPABASE_KEY") else "❌",
+            "B2_APPLICATION_KEY_ID": "✅" if os.getenv("B2_APPLICATION_KEY_ID") else "❌",
+            "B2_APPLICATION_KEY": "✅" if os.getenv("B2_APPLICATION_KEY") else "❌",
+            "B2_BUCKET_NAME": "✅" if os.getenv("B2_BUCKET_NAME") else "❌",
+            "B2_ENDPOINT_URL": "✅" if os.getenv("B2_ENDPOINT_URL") else "❌",
+            "REDIS_URL": "✅" if os.getenv("REDIS_URL") else "❌",
+        },
+        "components": {
+            "database": db is not None,
+            "youtube_parser": youtube_parser is not None,
+            "celery_tasks": scrape_task is not None,
+        },
+        "python_path": os.getcwd(),
+        "template_directory_exists": os.path.exists("templates"),
+    }
+    
+    return debug_data
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
