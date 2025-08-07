@@ -98,7 +98,12 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
 
 2. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   # Smart installer (handles psycopg2-binary issues automatically):
+   python install_dependencies.py
+   
+   # Or manually:
+   pip install -r requirements-no-postgres.txt  # Skip PostgreSQL deps
+   pip install -r requirements.txt              # Full install
    ```
 
 3. **Install FFmpeg**:

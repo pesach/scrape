@@ -2,15 +2,27 @@
 
 This guide helps resolve common installation issues with the YouTube Video Scraper.
 
+## ⚡ **Quick Fix for psycopg2-binary Error**
+
+If you're getting `psycopg2-binary` subprocess errors, **skip that dependency entirely**:
+
+```bash
+# Use this instead of requirements.txt
+pip install -r requirements-no-postgres.txt
+```
+
+**Why this works:** This project uses Supabase's HTTP API, so you don't need direct PostgreSQL drivers!
+
 ## 🐍 **Python Dependencies Issues**
 
 ### **Issue: `psycopg2-binary` Build Error**
 
 ```bash
 error: failed building wheel for psycopg2-binary
+subprocess-exited-with-error
 ```
 
-**This is a common issue on certain systems. Here are multiple solutions:**
+**This is a subprocess/compilation error, not a pip issue. Here are multiple solutions:**
 
 #### **Solution 1: Install System Dependencies First**
 
@@ -40,7 +52,16 @@ brew install postgresql
 pip install -r requirements.txt
 ```
 
-#### **Solution 2: Use Alternative Requirements File**
+#### **Solution 2: Skip PostgreSQL Dependencies (Recommended)**
+
+```bash
+# Use requirements file without psycopg2-binary
+pip install -r requirements-no-postgres.txt
+```
+
+**Why this works:** The Supabase client handles PostgreSQL connections internally via HTTP API, so you don't actually need `psycopg2-binary` for this project!
+
+#### **Solution 3: Use Alternative Requirements File**
 
 ```bash
 # Use the alternative requirements without psycopg2-binary
@@ -55,7 +76,7 @@ pip install psycopg2==2.9.9
 pip install asyncpg==0.29.0
 ```
 
-#### **Solution 3: Use Pre-compiled Wheels**
+#### **Solution 4: Use Pre-compiled Wheels**
 
 ```bash
 # Upgrade pip and use pre-compiled wheels
@@ -64,7 +85,7 @@ pip install --only-binary=psycopg2-binary psycopg2-binary
 pip install -r requirements.txt
 ```
 
-#### **Solution 4: Docker Installation (Recommended)**
+#### **Solution 5: Docker Installation (Always Works)**
 
 If you're having persistent issues, use Docker:
 
