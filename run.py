@@ -24,6 +24,7 @@ from config import config
 # Setup logging first
 from logging_config import setup_logging
 setup_logging()
+from logging_config import request_id_ctx_var
 
 # Now import and run the main application
 from main import app

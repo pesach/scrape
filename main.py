@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import traceback
+import time
 
 # Load environment variables FIRST (same as test_setup.py)
 try:
@@ -23,6 +24,7 @@ from config import config
 # Setup logging
 from logging_config import setup_logging
 setup_logging()
+from logging_config import request_id_ctx_var
 
 from models import (
     YouTubeURLCreate, YouTubeURLResponse, ScrapingJobResponse, 
@@ -48,14 +50,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Per-request logging context middleware
+@app.middleware("http")
+async def add_request_id_and_timing(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    token = request_id_ctx_var.set(request_id)
+    start_time = time.time()
+    response = None
+    try:
+        response = await call_next(request)
+        return response
+    except Exception:
+        # Ensure exceptions propagate through global handler, but we keep context
+        raise
+    finally:
+        duration_ms = int((time.time() - start_time) * 1000)
+        status_code = getattr(response, 'status_code', None)
+        logger.info(
+            f"Request completed: {request.method} {request.url.path} "
+            f"status={status_code} duration_ms={duration_ms} ua={request.headers.get('user-agent','-')}"
+        )
+        request_id_ctx_var.reset(token)
+
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global exception: {str(exc)}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
+    logger.exception(
+        "Global exception: %s | method=%s path=%s ua=%s", 
+        str(exc), request.method, request.url.path, request.headers.get('user-agent','-')
+    )
     
     return JSONResponse(
         status_code=500,
@@ -73,7 +99,7 @@ try:
     db = database_instance
     logger.info("✅ Database connection initialized")
 except Exception as e:
-    logger.error(f"❌ Database initialization failed: {str(e)}")
+    logger.exception("❌ Database initialization failed: %s", str(e))
     db = None
 
 # Initialize YouTube parser
@@ -83,7 +109,7 @@ try:
     youtube_parser = YouTubeURLParser
     logger.info("✅ YouTube parser initialized")
 except Exception as e:
-    logger.error(f"❌ YouTube parser initialization failed: {str(e)}")
+    logger.exception("❌ YouTube parser initialization failed: %s", str(e))
 
 # Initialize tasks (optional - may fail if Celery/Redis not available)
 scrape_task = None
@@ -164,7 +190,7 @@ async def home(request: Request):
     try:
         return templates.TemplateResponse("index.html", {"request": request})
     except Exception as e:
-        logger.error(f"Error rendering home page: {str(e)}")
+        logger.exception("Error rendering home page: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Template error: {str(e)}")
 
 @app.post("/api/urls", response_model=dict)
@@ -239,7 +265,7 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
                 )
                 logger.info(f"✅ Created URL record: {url_record.id}")
             except Exception as e:
-                logger.error(f"❌ Database error creating URL: {str(e)}")
+                logger.exception("❌ Database error creating URL: %s", str(e))
                 raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
             
             # Create scraping job
@@ -247,7 +273,7 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
                 job_record = await db.create_scraping_job(url_record.id)
                 logger.info(f"✅ Created job record: {job_record.id}")
             except Exception as e:
-                logger.error(f"❌ Database error creating job: {str(e)}")
+                logger.exception("❌ Database error creating job: %s", str(e))
                 raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
             
             # Start background scraping task (if available)
@@ -279,8 +305,7 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Unexpected error in submit_url: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.exception("❌ Unexpected error in submit_url: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/api/urls", response_model=List[YouTubeURLResponse])
@@ -295,7 +320,7 @@ async def list_urls(limit: int = 50, offset: int = 0):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error listing URLs: {str(e)}")
+        logger.exception("Error listing URLs: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/urls/{url_id}", response_model=YouTubeURLResponse)
@@ -315,7 +340,7 @@ async def get_url(url_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting URL: {str(e)}")
+        logger.exception("Error getting URL: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/urls/{url_id}/videos", response_model=List[VideoResponse])
@@ -333,7 +358,7 @@ async def get_url_videos(url_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting videos: {str(e)}")
+        logger.exception("Error getting videos: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.get("/api/jobs/{job_id}", response_model=ScrapingJobResponse)
@@ -353,7 +378,7 @@ async def get_job_status(job_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting job status: {str(e)}")
+        logger.exception("Error getting job status: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.post("/api/validate-url")
@@ -378,7 +403,7 @@ async def validate_url(url_data: YouTubeURLCreate):
             "error": str(e)
         }
     except Exception as e:
-        logger.error(f"Error validating URL: {str(e)}")
+        logger.exception("Error validating URL: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
 
 @app.get("/dashboard")
@@ -387,7 +412,7 @@ async def dashboard(request: Request):
     try:
         return templates.TemplateResponse("dashboard.html", {"request": request})
     except Exception as e:
-        logger.error(f"Error rendering dashboard: {str(e)}")
+        logger.exception("Error rendering dashboard: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Template error: {str(e)}")
 
 @app.get("/api/dashboard-data")
@@ -416,7 +441,7 @@ async def dashboard_data():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting dashboard data: {str(e)}")
+        logger.exception("Error getting dashboard data: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Dashboard error: {str(e)}")
 
 # Debug endpoint to check what's wrong

@@ -24,6 +24,7 @@ from config import config
 # Setup logging
 from logging_config import setup_logging
 setup_logging()
+from logging_config import request_id_ctx_var
 
 import logging
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ if __name__ == "__main__":
         r.ping()
         logger.info(f"✅ Connected to Redis at {redis_url}")
     except Exception as e:
-        logger.error(f"❌ Cannot connect to Redis at {redis_url}: {str(e)}")
+        logger.exception(f"❌ Cannot connect to Redis at {redis_url}: {str(e)}")
         print(f"❌ Cannot connect to Redis at {redis_url}")
         print("Please ensure Redis is running and accessible.")
         sys.exit(1)
