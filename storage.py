@@ -86,23 +86,23 @@ class BackblazeB2Storage:
             
         except FileNotFoundError:
             error_msg = f"Local file not found: {local_file_path}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
             
         except NoCredentialsError:
             error_msg = "Backblaze B2 credentials not found or invalid"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
             
         except ClientError as e:
             error_code = e.response['Error']['Code']
             error_msg = f"B2 upload failed ({error_code}): {e.response['Error']['Message']}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
             
         except Exception as e:
             error_msg = f"Unexpected error during B2 upload: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
     
     def delete_file(self, remote_key: str) -> Tuple[bool, str]:
@@ -123,12 +123,12 @@ class BackblazeB2Storage:
         except ClientError as e:
             error_code = e.response['Error']['Code']
             error_msg = f"B2 delete failed ({error_code}): {e.response['Error']['Message']}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
             
         except Exception as e:
             error_msg = f"Unexpected error during B2 delete: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
     
     def file_exists(self, remote_key: str) -> bool:
@@ -196,7 +196,7 @@ class BackblazeB2Storage:
             )
             return url
         except Exception as e:
-            logger.error(f"Failed to generate presigned URL for {remote_key}: {str(e)}")
+            logger.exception(f"Failed to generate presigned URL for {remote_key}: {str(e)}")
             return None
     
     def list_files(self, prefix: str = "", max_keys: int = 1000) -> list:
@@ -229,7 +229,7 @@ class BackblazeB2Storage:
             return files
             
         except Exception as e:
-            logger.error(f"Failed to list files: {str(e)}")
+            logger.exception(f"Failed to list files: {str(e)}")
             return []
 
 def generate_video_key(video_id: str, title: str, extension: str = "mp4") -> str:

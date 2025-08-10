@@ -202,7 +202,7 @@ class VideoScraper:
                 info = ydl.extract_info(url, download=False)
                 return info
             except Exception as e:
-                logger.error(f"Failed to extract video info for {url}: {str(e)}")
+                logger.exception(f"Failed to extract video info for {url}: {str(e)}")
                 raise
     
     def _convert_scraperapi_to_ytdlp_format(self, scraperapi_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -211,7 +211,7 @@ class VideoScraper:
         
         Args:
             scraperapi_info: Video info from ScraperAPI
-            
+        
         Returns:
             yt-dlp compatible info dictionary
         """
@@ -263,7 +263,7 @@ class VideoScraper:
             url: Video URL
             video_id: YouTube video ID
             info: Extracted video info for ratelimit computation
-            
+        
         Returns:
             Tuple of (success, message, file_path)
         """
@@ -313,7 +313,7 @@ class VideoScraper:
                     
         except Exception as e:
             error_msg = f"Failed to download video {video_id}: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg, None
     
     def process_video_metadata(self, info: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,7 +362,7 @@ class VideoScraper:
         Args:
             url: Video URL
             youtube_url_id: ID of the YouTube URL record
-            
+        
         Returns:
             Tuple of (success, message)
         """
@@ -430,7 +430,7 @@ class VideoScraper:
                     
         except Exception as e:
             error_msg = f"Error processing video {url}: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg
     
     async def scrape_playlist_or_channel(self, url: str, youtube_url_id: uuid.UUID, max_videos: int = None) -> Tuple[bool, str, int]:
@@ -441,7 +441,7 @@ class VideoScraper:
             url: Playlist or channel URL
             youtube_url_id: ID of the YouTube URL record
             max_videos: Maximum number of videos to process (None for all)
-            
+        
         Returns:
             Tuple of (success, message, videos_processed)
         """
@@ -486,7 +486,7 @@ class VideoScraper:
                         
                 except Exception as e:
                     failed_videos += 1
-                    logger.error(f"Error processing video {i+1}/{total_videos}: {str(e)}")
+                    logger.exception(f"Error processing video {i+1}/{total_videos}: {str(e)}")
                 
                 # Human-like randomized delay between videos
                 delay = random.uniform(self.config.HUMAN_DELAY_MIN_SEC, self.config.HUMAN_DELAY_MAX_SEC)
@@ -500,7 +500,7 @@ class VideoScraper:
             
         except Exception as e:
             error_msg = f"Error processing playlist/channel {url}: {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return False, error_msg, 0
     
     async def scrape_url(self, url: str, url_type: URLType, youtube_url_id: uuid.UUID) -> Tuple[bool, str, int]:
@@ -511,7 +511,7 @@ class VideoScraper:
             url: YouTube URL
             url_type: Type of URL (video, playlist, channel, user)
             youtube_url_id: ID of the YouTube URL record
-            
+        
         Returns:
             Tuple of (success, message, videos_processed)
         """
