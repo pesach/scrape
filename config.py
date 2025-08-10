@@ -80,6 +80,20 @@ class Config:
     
     # Optional hard cap on download rate (bytes/sec). If set, overrides watch-time-derived rate
     DOWNLOAD_RATELIMIT_BPS: int = int(os.getenv("DOWNLOAD_RATELIMIT_BPS", "0"))
+    
+    # --- ScraperAPI Configuration ---
+    # Enable ScraperAPI for YouTube scraping (alternative to yt-dlp)
+    USE_SCRAPERAPI: bool = os.getenv("USE_SCRAPERAPI", "false").lower() in ("true", "1", "yes")
+    SCRAPERAPI_KEY: str = os.getenv("SCRAPERAPI_KEY", "")
+    SCRAPERAPI_ENDPOINT: str = os.getenv("SCRAPERAPI_ENDPOINT", "https://api.scraperapi.com")
+    # Render JavaScript content (required for YouTube)
+    SCRAPERAPI_RENDER: bool = os.getenv("SCRAPERAPI_RENDER", "true").lower() in ("true", "1", "yes")
+    # Premium proxy pool for better success rates
+    SCRAPERAPI_PREMIUM: bool = os.getenv("SCRAPERAPI_PREMIUM", "false").lower() in ("true", "1", "yes")
+    # Retry failed requests
+    SCRAPERAPI_RETRY_FAILED: bool = os.getenv("SCRAPERAPI_RETRY_FAILED", "true").lower() in ("true", "1", "yes")
+    # Timeout for ScraperAPI requests (seconds)
+    SCRAPERAPI_TIMEOUT: int = int(os.getenv("SCRAPERAPI_TIMEOUT", "60"))
 
     @classmethod
     def validate(cls) -> tuple[bool, list[str]]:
@@ -96,6 +110,10 @@ class Config:
             "B2_APPLICATION_KEY": cls.B2_APPLICATION_KEY,
             "B2_BUCKET_NAME": cls.B2_BUCKET_NAME,
         }
+        
+        # Add ScraperAPI key to required if enabled
+        if cls.USE_SCRAPERAPI:
+            required_vars["SCRAPERAPI_KEY"] = cls.SCRAPERAPI_KEY
         
         missing = [name for name, value in required_vars.items() if not value]
         
@@ -122,6 +140,10 @@ class Config:
             "watch_speed": cls.WATCH_SPEED,
             "cookies_file_set": bool(cls.YT_COOKIES_FILE),
             "cookies_from_browser": cls.COOKIES_FROM_BROWSER or None,
+            # ScraperAPI settings
+            "use_scraperapi": cls.USE_SCRAPERAPI,
+            "scraperapi_configured": bool(cls.SCRAPERAPI_KEY),
+            "scraperapi_premium": cls.SCRAPERAPI_PREMIUM,
         }
 
 # Initialize configuration on import
