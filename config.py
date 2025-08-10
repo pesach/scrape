@@ -58,7 +58,29 @@ class Config:
     # Optional: Environment detection
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+
+    # --- Scraping realism settings ---
+    # Realistic browser headers
+    SCRAPER_USER_AGENT: str = os.getenv(
+        "SCRAPER_USER_AGENT",
+        # Chrome 126 on Linux x86_64
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    )
+    SCRAPER_ACCEPT_LANGUAGE: str = os.getenv("SCRAPER_ACCEPT_LANGUAGE", "en-US,en;q=0.9")
+
+    # Cookies: provide either a cookies.txt file or a browser name for cookiesfrombrowser
+    YT_COOKIES_FILE: str = os.getenv("YT_COOKIES_FILE", "")  # Path to Netscape cookies.txt
+    COOKIES_FROM_BROWSER: str = os.getenv("COOKIES_FROM_BROWSER", "")  # e.g., chrome|firefox|brave|edge
+
+    # Pacing
+    SIMULATE_WATCH_TIME: bool = os.getenv("SIMULATE_WATCH_TIME", "false").lower() in ("true", "1", "yes")
+    WATCH_SPEED: float = float(os.getenv("WATCH_SPEED", "1.25"))  # 1.0 = realtime, >1 faster than realtime
+    HUMAN_DELAY_MIN_SEC: float = float(os.getenv("HUMAN_DELAY_MIN_SEC", "3.0"))
+    HUMAN_DELAY_MAX_SEC: float = float(os.getenv("HUMAN_DELAY_MAX_SEC", "10.0"))
     
+    # Optional hard cap on download rate (bytes/sec). If set, overrides watch-time-derived rate
+    DOWNLOAD_RATELIMIT_BPS: int = int(os.getenv("DOWNLOAD_RATELIMIT_BPS", "0"))
+
     @classmethod
     def validate(cls) -> tuple[bool, list[str]]:
         """
@@ -95,6 +117,11 @@ class Config:
             "max_file_size_gb": cls.MAX_FILE_SIZE_GB,
             "environment": cls.ENVIRONMENT,
             "debug": cls.DEBUG,
+            # Non-sensitive scraper settings
+            "simulate_watch_time": cls.SIMULATE_WATCH_TIME,
+            "watch_speed": cls.WATCH_SPEED,
+            "cookies_file_set": bool(cls.YT_COOKIES_FILE),
+            "cookies_from_browser": cls.COOKIES_FROM_BROWSER or None,
         }
 
 # Initialize configuration on import
