@@ -38,6 +38,8 @@ class BackblazeB2Storage:
                 }
             )
         )
+        # Backward-compatible alias used by tests
+        self.client = self.s3_client
     
     def upload_file(self, local_file_path: str, remote_key: str, content_type: str = None) -> Tuple[bool, str]:
         """
