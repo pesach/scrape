@@ -11,6 +11,7 @@ from storage import storage, generate_video_key
 from database import db
 import uuid
 import asyncio
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +44,90 @@ class VideoScraper:
         
         self.download_path = config.DOWNLOAD_PATH
         self.max_file_size_gb = config.MAX_FILE_SIZE_GB
+        self.config = config
         
         # Create download directory if it doesn't exist
         Path(self.download_path).mkdir(parents=True, exist_ok=True)
     
-    def get_ydl_opts(self, output_path: str) -> Dict[str, Any]:
+    def _build_common_ydl_opts(self) -> Dict[str, Any]:
+        """Build common yt-dlp options for headers, cookies, and politeness."""
+        opts: Dict[str, Any] = {
+            'quiet': True,
+            'no_warnings': True,
+            'http_headers': {
+                'User-Agent': self.config.SCRAPER_USER_AGENT,
+                'Accept-Language': self.config.SCRAPER_ACCEPT_LANGUAGE,
+                'Referer': 'https://www.youtube.com/',
+            },
+        }
+        # Cookies
+        if self.config.YT_COOKIES_FILE:
+            opts['cookiefile'] = self.config.YT_COOKIES_FILE
+        elif self.config.COOKIES_FROM_BROWSER:
+            # e.g., ('chrome',) or ('firefox',)
+            browser = self.config.COOKIES_FROM_BROWSER.strip().lower()
+            opts['cookiesfrombrowser'] = (browser, )
+        
+        # Request pacing inside yt-dlp
+        opts['sleep_interval_requests'] = self.config.HUMAN_DELAY_MIN_SEC
+        opts['max_sleep_interval_requests'] = self.config.HUMAN_DELAY_MAX_SEC
+        return opts
+    
+    def _compute_watchlike_ratelimit(self, info: Dict[str, Any]) -> Optional[int]:
+        """
+        Compute bytes/sec to approximate playback rate.
+        Priorities:
+          1) Config DOWNLOAD_RATELIMIT_BPS if set
+          2) filesize/duration adjusted by WATCH_SPEED
+          3) Heuristic by resolution
+        """
+        if self.config.DOWNLOAD_RATELIMIT_BPS and self.config.DOWNLOAD_RATELIMIT_BPS > 0:
+            return int(self.config.DOWNLOAD_RATELIMIT_BPS)
+        
+        if not self.config.SIMULATE_WATCH_TIME:
+            return None
+        
+        try:
+            duration = info.get('duration') or 0
+            if duration and duration > 0:
+                # Try precise filesize from selected format if present
+                preferred_filesize = None
+                # formats may contain filesize for muxed or individual streams
+                for f in (info.get('formats') or []):
+                    if f.get('ext') in {'mp4', 'mkv', 'webm'} and f.get('filesize'):
+                        preferred_filesize = f.get('filesize')
+                        break
+                total_bytes = preferred_filesize or info.get('filesize') or info.get('filesize_approx')
+                if total_bytes and total_bytes > 0:
+                    bps = total_bytes / (duration / max(0.1, self.config.WATCH_SPEED))
+                    return max(64_000, int(bps))  # >= 64KB/s
+        except Exception:
+            pass
+        
+        # Heuristic fallback by resolution
+        width = height = 0
+        best_format = None
+        for f in (info.get('formats') or []):
+            if f.get('vcodec') != 'none':
+                if (f.get('height', 0), f.get('width', 0)) > (height, width):
+                    height = f.get('height', 0)
+                    width = f.get('width', 0)
+                    best_format = f
+        # Typical AVC bitrates (very rough)
+        if height >= 1080:
+            mbps = 8.0
+        elif height >= 720:
+            mbps = 3.0
+        elif height >= 480:
+            mbps = 1.0
+        else:
+            mbps = 0.6
+        bps = (mbps * 1_000_000) / max(0.1, self.config.WATCH_SPEED)
+        return int(bps)
+    
+    def get_ydl_opts(self, output_path: str, info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get yt-dlp options for downloading highest quality video"""
-        return {
+        opts: Dict[str, Any] = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': output_path,
             'writeinfojson': True,
@@ -70,6 +148,17 @@ class VideoScraper:
             # Size limit
             'max_filesize': int(self.max_file_size_gb * 1024 * 1024 * 1024),  # Convert GB to bytes
         }
+        
+        # Merge common options (headers, cookies, request-sleep)
+        opts.update(self._build_common_ydl_opts())
+        
+        # Rate limiting to simulate watch-time
+        ratelimit_bps = self._compute_watchlike_ratelimit(info or {})
+        if ratelimit_bps:
+            opts['ratelimit'] = ratelimit_bps
+            logger.debug(f"Using ratelimit {ratelimit_bps} B/s to simulate watch-time")
+        
+        return opts
     
     def extract_video_info(self, url: str) -> Dict[str, Any]:
         """Extract video information without downloading"""
@@ -78,6 +167,8 @@ class VideoScraper:
             'no_warnings': True,
             'extract_flat': False,
         }
+        # Use same headers/cookies for info extraction
+        ydl_opts.update(self._build_common_ydl_opts())
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
@@ -87,13 +178,14 @@ class VideoScraper:
                 logger.error(f"Failed to extract video info for {url}: {str(e)}")
                 raise
     
-    def download_video(self, url: str, video_id: str) -> Tuple[bool, str, Optional[str]]:
+    def download_video(self, url: str, video_id: str, info: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
         """
         Download a single video
         
         Args:
             url: Video URL
             video_id: YouTube video ID
+            info: Extracted video info for ratelimit computation
             
         Returns:
             Tuple of (success, message, file_path)
@@ -102,7 +194,7 @@ class VideoScraper:
             # Create temporary directory for this download
             with tempfile.TemporaryDirectory(dir=self.download_path) as temp_dir:
                 output_template = os.path.join(temp_dir, f"{video_id}.%(ext)s")
-                ydl_opts = self.get_ydl_opts(output_template)
+                ydl_opts = self.get_ydl_opts(output_template, info)
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     logger.info(f"Starting download for video {video_id}")
@@ -199,7 +291,7 @@ class VideoScraper:
             video_data = self.process_video_metadata(info)
             
             # Download video
-            success, message, file_path = self.download_video(url, video_id)
+            success, message, file_path = self.download_video(url, video_id, info)
             if not success:
                 return False, f"Download failed: {message}"
             
@@ -267,6 +359,7 @@ class VideoScraper:
                 'extract_flat': True,  # Only get video URLs, don't extract full info yet
                 'playlistend': max_videos,
             }
+            ydl_opts.update(self._build_common_ydl_opts())
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -300,10 +393,9 @@ class VideoScraper:
                     failed_videos += 1
                     logger.error(f"Error processing video {i+1}/{total_videos}: {str(e)}")
                 
-                # IMPORTANT: Rate limiting delay to avoid overwhelming YouTube
-                # This prevents IP blocking and ensures stable operation
-                # For high-volume usage, consider implementing exponential backoff
-                await asyncio.sleep(1)
+                # Human-like randomized delay between videos
+                delay = random.uniform(self.config.HUMAN_DELAY_MIN_SEC, self.config.HUMAN_DELAY_MAX_SEC)
+                await asyncio.sleep(delay)
             
             success_msg = f"Processed {processed_videos} videos successfully"
             if failed_videos > 0:
