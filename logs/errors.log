@@ -1,0 +1,63 @@
+2025-08-10 18:40:45,019 | ERROR | main | req_id=- | 4864/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
+2025-08-10 18:40:45,615 | ERROR | main | req_id=- | 4868/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
+2025-08-10 18:41:23,839 | ERROR | main | req_id=- | 5228/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
