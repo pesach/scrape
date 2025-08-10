@@ -237,6 +237,51 @@ pip install -r requirements.txt
 
 ## 🚨 **Common Error Solutions**
 
+### **Error: `yt-dlp not found`**
+
+**Solution:** Install yt-dlp: `pip install yt-dlp`
+
+- Verify version:
+  ```bash
+  python -c "import yt_dlp, sys; print('yt-dlp', getattr(yt_dlp, '__version__', 'unknown'), 'on', sys.executable)"
+  ```
+- If running in Docker, rebuild: `docker-compose up --build -d`
+
+### **Error: Stale yt-dlp (site extraction error)**
+
+**Symptoms:** Errors mentioning extractors, signatures, or similar.
+
+**Solutions:**
+- Update manually:
+  ```bash
+  pip install --upgrade yt-dlp
+  ```
+- Or trigger the scheduled updater (requires worker running with beat):
+  ```bash
+  celery -A tasks call update_yt_dlp
+  ```
+
+### **403 / Access Denied / Needs cookies**
+
+**Solutions:**
+- Provide cookies via `.env`:
+  ```bash
+  YT_COOKIES_FILE=/path/to/cookies.txt
+  # or
+  COOKIES_FROM_BROWSER=chrome
+  ```
+- Ensure a realistic user agent and language are set:
+  ```bash
+  SCRAPER_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+  SCRAPER_ACCEPT_LANGUAGE="en-US,en;q=0.9"
+  ```
+- Reduce aggressiveness by enabling pacing:
+  ```bash
+  SIMULATE_WATCH_TIME=true
+  HUMAN_DELAY_MIN_SEC=3
+  HUMAN_DELAY_MAX_SEC=10
+  ```
+
 ### **Error: `Microsoft Visual C++ 14.0 is required`** (Windows)
 
 **Solution:**

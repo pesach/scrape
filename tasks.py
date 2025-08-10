@@ -3,6 +3,8 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 import uuid
+import subprocess
+import sys
 
 from celery_app import celery_app
 from models import JobStatus, URLType
@@ -152,6 +154,42 @@ def cleanup_old_jobs_task(self, days_old: int = 7):
     finally:
         loop.close()
 
+@celery_app.task(bind=True, name='update_yt_dlp')
+def update_yt_dlp_task(self):
+    """Update yt-dlp to the latest version daily.
+    Uses pip to upgrade the library in the current environment and logs versions.
+    """
+    try:
+        # Show current version
+        try:
+            import yt_dlp
+            current_version = getattr(yt_dlp, "__version__", "unknown")
+        except Exception:
+            current_version = "unknown"
+        logger.info(f"Current yt-dlp version: {current_version}")
+
+        # Upgrade using pip of this Python interpreter
+        cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', 'yt-dlp']
+        logger.info(f"Running upgrade command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        logger.info(f"pip stdout: {result.stdout}")
+        if result.returncode != 0:
+            logger.error(f"pip stderr: {result.stderr}")
+            return {'success': False, 'error': 'pip upgrade failed', 'stderr': result.stderr}
+
+        # Verify updated version
+        try:
+            import importlib
+            yt_dlp_module = importlib.reload(__import__('yt_dlp'))
+            new_version = getattr(yt_dlp_module, "__version__", "unknown")
+        except Exception:
+            new_version = "unknown"
+        logger.info(f"Updated yt-dlp version: {new_version}")
+        return {'success': True, 'from': current_version, 'to': new_version}
+    except Exception as e:
+        logger.error(f"Failed to update yt-dlp: {e}")
+        return {'success': False, 'error': str(e)}
+
 # Periodic tasks can be configured here
 from celery.schedules import crontab
 
@@ -160,6 +198,10 @@ celery_app.conf.beat_schedule = {
         'task': 'cleanup_old_jobs',
         'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
         'args': (7,)  # Clean up jobs older than 7 days
+    },
+    'update-yt-dlp-daily': {
+        'task': 'update_yt_dlp',
+        'schedule': crontab(hour=3, minute=0),  # Run daily at 3 AM UTC
     },
 }
 

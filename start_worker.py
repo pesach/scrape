@@ -49,9 +49,10 @@ if __name__ == "__main__":
     # Import celery app
     from celery_app import celery_app
     
-    # Start worker
+    # Start worker with embedded beat for scheduled tasks
     celery_app.worker_main([
         'worker',
+        '--beat',
         '--loglevel=info',
         '--concurrency=2',  # Limit concurrent downloads
         '--queues=default,scraping'
