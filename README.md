@@ -17,6 +17,7 @@ A comprehensive system to scrape YouTube videos and store them in Backblaze B2 w
 - **Automatic Cleanup**: Videos deleted from server after cloud upload
 - **No API Keys**: Uses yt-dlp scraping instead of YouTube API
 - **Human-like Scraping**: Realistic headers, optional cookies, watch-time pacing, randomized delays
+- **ScraperAPI Integration**: Optional alternative scraping method with proxy rotation and CAPTCHA handling
 - **Daily yt-dlp Updates**: Automatically updates yt-dlp to the latest version every day
 
 ## Architecture & Flow
@@ -65,7 +66,8 @@ User Input → Rate Limit Check → Supabase DB → Redis Queue → Celery Worke
 ### **Important Technical Details:**
 
 **🎯 Metadata Extraction:**
-- **Source**: yt-dlp scraping (NOT YouTube API)
+- **Primary Source**: yt-dlp scraping (NOT YouTube API)
+- **Alternative Source**: ScraperAPI (optional, for enhanced reliability)
 - **Benefits**: No API keys, no rate limits, more detailed data
 - **Method**: Direct web scraping like a browser would do
 - **Handles**: Private/unlisted videos if accessible
@@ -207,6 +209,47 @@ DOWNLOAD_RATELIMIT_BPS=0
 Notes:
 - If both `YT_COOKIES_FILE` and `COOKIES_FROM_BROWSER` are set, `YT_COOKIES_FILE` takes precedence.
 - When `SIMULATE_WATCH_TIME` is enabled, the downloader estimates a rate limit from filesize and duration or uses a resolution-based heuristic.
+
+### ScraperAPI Integration (Alternative Scraping Method)
+
+You can optionally use ScraperAPI as an alternative to yt-dlp for extracting YouTube metadata. ScraperAPI handles:
+- Automatic proxy rotation
+- CAPTCHA solving
+- JavaScript rendering
+- IP rotation to avoid rate limits
+
+**Configuration:**
+
+```bash
+# Enable ScraperAPI for YouTube scraping (alternative to yt-dlp)
+USE_SCRAPERAPI=false                              # Set to true to enable
+SCRAPERAPI_KEY=your_scraperapi_key               # Your ScraperAPI key
+SCRAPERAPI_ENDPOINT=https://api.scraperapi.com   # ScraperAPI endpoint
+SCRAPERAPI_RENDER=true                           # Render JavaScript (required for YouTube)
+SCRAPERAPI_PREMIUM=false                         # Use premium proxy pool
+SCRAPERAPI_RETRY_FAILED=true                     # Retry failed requests
+SCRAPERAPI_TIMEOUT=60                            # Request timeout in seconds
+```
+
+**Features when using ScraperAPI:**
+- **Metadata Extraction**: Extracts video title, description, duration, views, likes, channel info, etc.
+- **Channel Scraping**: Can scrape channel about pages for channel metadata
+- **Playlist Support**: Extract playlist information and video lists
+- **Fallback to yt-dlp**: If ScraperAPI fails, automatically falls back to yt-dlp
+- **No Video Download**: ScraperAPI only extracts metadata; video downloads still use yt-dlp
+
+**When to use ScraperAPI:**
+- When experiencing rate limiting or IP blocks with yt-dlp
+- When you only need metadata without downloading videos
+- When scraping from regions with restricted access
+- As a backup method when yt-dlp encounters issues
+
+**Get your ScraperAPI key:**
+1. Sign up at [ScraperAPI.com](https://www.scraperapi.com)
+2. Get your API key from the dashboard
+3. Add it to your `.env` file or environment variables
+
+**Note:** ScraperAPI is a paid service with a free tier. Check their pricing for your usage needs.
 
 ### Daily yt-dlp Auto-Update
 

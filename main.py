@@ -104,7 +104,8 @@ async def health_check():
             "database": "unknown",
             "youtube_parser": "unknown", 
             "celery": "unknown",
-            "environment": "unknown"
+            "environment": "unknown",
+            "scraperapi": "unknown"
         }
     }
     
@@ -134,6 +135,16 @@ async def health_check():
     
     # Check Celery
     status["components"]["celery"] = "available" if scrape_task else "not available"
+    
+    # Check ScraperAPI
+    if config.USE_SCRAPERAPI:
+        if config.SCRAPERAPI_KEY:
+            status["components"]["scraperapi"] = "enabled and configured"
+        else:
+            status["components"]["scraperapi"] = "enabled but missing API key"
+            status["status"] = "degraded"
+    else:
+        status["components"]["scraperapi"] = "disabled"
     
     # Check environment variables
     is_valid, missing_vars = config.validate()

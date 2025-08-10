@@ -17,17 +17,18 @@ logger = logging.getLogger(__name__)
 
 class VideoScraper:
     """
-    YouTube video scraper using yt-dlp
+    YouTube video scraper using yt-dlp or ScraperAPI
     
     IMPORTANT DESIGN DECISIONS:
     
-    1. METADATA SOURCE: Uses yt-dlp scraping (NOT YouTube API)
-       - Benefits: No API keys needed, no rate limits, more metadata
+    1. METADATA SOURCE: Uses yt-dlp scraping OR ScraperAPI (NOT YouTube API)
+       - yt-dlp: No API keys needed, downloads videos, more complete metadata
+       - ScraperAPI: Handles CAPTCHAs, proxy rotation, metadata only (no download)
        - Method: Direct web scraping like a browser
        - Handles: Private/unlisted videos if accessible
     
     2. STORAGE STRATEGY: Temporary local → Permanent cloud
-       - Downloads to temp directory first
+       - Downloads to temp directory first (yt-dlp only)
        - Uploads to Backblaze B2 cloud storage
        - Immediately deletes local file after upload
        - Result: Near-zero local disk usage
@@ -48,6 +49,20 @@ class VideoScraper:
         
         # Create download directory if it doesn't exist
         Path(self.download_path).mkdir(parents=True, exist_ok=True)
+        
+        # Initialize ScraperAPI client if enabled
+        self.scraperapi_client = None
+        if self.config.USE_SCRAPERAPI and self.config.SCRAPERAPI_KEY:
+            from scraperapi_client import ScraperAPIClient
+            self.scraperapi_client = ScraperAPIClient(
+                api_key=self.config.SCRAPERAPI_KEY,
+                endpoint=self.config.SCRAPERAPI_ENDPOINT,
+                render=self.config.SCRAPERAPI_RENDER,
+                premium=self.config.SCRAPERAPI_PREMIUM,
+                retry_failed=self.config.SCRAPERAPI_RETRY_FAILED,
+                timeout=self.config.SCRAPERAPI_TIMEOUT
+            )
+            logger.info("ScraperAPI client initialized for YouTube scraping")
     
     def _build_common_ydl_opts(self) -> Dict[str, Any]:
         """Build common yt-dlp options for headers, cookies, and politeness."""
@@ -162,6 +177,18 @@ class VideoScraper:
     
     def extract_video_info(self, url: str) -> Dict[str, Any]:
         """Extract video information without downloading"""
+        # Use ScraperAPI if enabled and available
+        if self.scraperapi_client:
+            try:
+                logger.info(f"Using ScraperAPI to extract video info for {url}")
+                info = self.scraperapi_client.get_video_info(url)
+                # Convert ScraperAPI format to yt-dlp compatible format
+                return self._convert_scraperapi_to_ytdlp_format(info)
+            except Exception as e:
+                logger.warning(f"ScraperAPI failed, falling back to yt-dlp: {str(e)}")
+                # Fall back to yt-dlp if ScraperAPI fails
+        
+        # Original yt-dlp extraction
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -178,6 +205,56 @@ class VideoScraper:
                 logger.error(f"Failed to extract video info for {url}: {str(e)}")
                 raise
     
+    def _convert_scraperapi_to_ytdlp_format(self, scraperapi_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert ScraperAPI response format to yt-dlp compatible format
+        
+        Args:
+            scraperapi_info: Video info from ScraperAPI
+            
+        Returns:
+            yt-dlp compatible info dictionary
+        """
+        # Parse upload date if present
+        upload_date = None
+        if scraperapi_info.get('upload_date'):
+            try:
+                # Try to parse ISO format date
+                dt = datetime.fromisoformat(scraperapi_info['upload_date'].replace('Z', '+00:00'))
+                upload_date = dt.strftime('%Y%m%d')
+            except:
+                pass
+        
+        # Convert to yt-dlp format
+        ytdlp_info = {
+            'id': scraperapi_info.get('youtube_id', ''),
+            'title': scraperapi_info.get('title', ''),
+            'description': scraperapi_info.get('description', ''),
+            'duration': scraperapi_info.get('duration'),
+            'view_count': scraperapi_info.get('view_count'),
+            'like_count': scraperapi_info.get('like_count'),
+            'upload_date': upload_date,
+            'uploader': scraperapi_info.get('channel_name', ''),
+            'uploader_url': scraperapi_info.get('channel_url', ''),
+            'thumbnail': scraperapi_info.get('thumbnail_url', ''),
+            'webpage_url': scraperapi_info.get('url', ''),
+            'tags': scraperapi_info.get('tags', []),
+            'categories': [scraperapi_info.get('category')] if scraperapi_info.get('category') else [],
+            'is_live': scraperapi_info.get('is_live', False),
+            'age_limit': 18 if scraperapi_info.get('is_age_restricted') else 0,
+            # ScraperAPI doesn't provide these, set defaults
+            'formats': [],
+            'width': None,
+            'height': None,
+            'fps': None,
+            'vcodec': None,
+            'acodec': None,
+            'filesize': None,
+            '_scraperapi_metadata': True,  # Flag to indicate this came from ScraperAPI
+        }
+        
+        return ytdlp_info
+    
     def download_video(self, url: str, video_id: str, info: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
         """
         Download a single video
@@ -190,6 +267,24 @@ class VideoScraper:
         Returns:
             Tuple of (success, message, file_path)
         """
+        # Check if this is ScraperAPI metadata (no download capability)
+        if info.get('_scraperapi_metadata'):
+            logger.warning(f"Video {video_id} metadata was extracted via ScraperAPI. Download requires yt-dlp.")
+            # Try to re-extract with yt-dlp for download
+            try:
+                ydl_opts = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': False,
+                }
+                ydl_opts.update(self._build_common_ydl_opts())
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+            except Exception as e:
+                return False, f"Cannot download video {video_id}: ScraperAPI provides metadata only, and yt-dlp failed: {str(e)}", None
+        
+        # Original download logic continues...
         try:
             # Create temporary directory for this download
             with tempfile.TemporaryDirectory(dir=self.download_path) as temp_dir:
