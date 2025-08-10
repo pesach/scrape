@@ -1,0 +1,2 @@
+yt-dlp[curl-cffi]>=2024.04.09
+curl-cffi>=0.6
