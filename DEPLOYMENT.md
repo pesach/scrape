@@ -118,6 +118,17 @@ APP_PORT=8000
 APP_WORKERS=4
 DOWNLOAD_PATH=/tmp/youtube_downloads
 MAX_FILE_SIZE_GB=2
+
+# Human-like Scraping (optional)
+SCRAPER_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+SCRAPER_ACCEPT_LANGUAGE="en-US,en;q=0.9"
+YT_COOKIES_FILE=/path/to/cookies.txt
+COOKIES_FROM_BROWSER=chrome
+SIMULATE_WATCH_TIME=true
+WATCH_SPEED=1.25
+HUMAN_DELAY_MIN_SEC=3.0
+HUMAN_DELAY_MAX_SEC=10.0
+DOWNLOAD_RATELIMIT_BPS=0
 ```
 
 ### **Step 5: Create Systemd Services**
@@ -172,6 +183,8 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
+> Note: The bundled worker starts Celery beat automatically (`--beat`) to run scheduled tasks, including daily yt-dlp updates.
+
 ### **Step 6: Nginx Configuration**
 
 ```bash
@@ -196,13 +209,6 @@ server {
         alias /home/youtube-scraper/scrape/static/;
     }
 }
-```
-
-Enable the site:
-```bash
-sudo ln -s /etc/nginx/sites-available/youtube-scraper /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
 ```
 
 ## 🔄 **Automatic GitHub Updates**

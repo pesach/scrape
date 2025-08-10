@@ -53,6 +53,35 @@ REDIS_URL=redis://localhost:6379/0
 
 ---
 
+## 🧑‍💻 **Optional: Human-like Scraping Settings**
+
+These help the scraper behave like a real browser session and a human viewer.
+
+```bash
+# Realistic browser headers
+SCRAPER_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+SCRAPER_ACCEPT_LANGUAGE="en-US,en;q=0.9"
+
+# Cookies: either provide a cookies.txt or extract from a browser profile
+YT_COOKIES_FILE=/path/to/cookies.txt
+COOKIES_FROM_BROWSER=chrome  # chrome|firefox|brave|edge
+
+# Watch-time pacing
+SIMULATE_WATCH_TIME=true
+WATCH_SPEED=1.25
+HUMAN_DELAY_MIN_SEC=3.0
+HUMAN_DELAY_MAX_SEC=10.0
+
+# Optional hard cap (bytes/sec). If set, overrides watch-time rate
+DOWNLOAD_RATELIMIT_BPS=0
+```
+
+Notes:
+- If both `YT_COOKIES_FILE` and `COOKIES_FROM_BROWSER` are set, `YT_COOKIES_FILE` wins.
+- When watch-time simulation is enabled, downloads are rate-limited to approximate playback.
+
+---
+
 ## 🚀 **Quick Setup Commands**
 
 ### 1. Edit your .env file:
@@ -73,7 +102,7 @@ python3 test_setup.py
 # Terminal 1 - Start the web server
 python3 run.py
 
-# Terminal 2 - Start the worker
+# Terminal 2 - Start the worker (includes scheduler for daily updates)
 python3 start_worker.py
 ```
 

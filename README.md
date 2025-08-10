@@ -16,6 +16,8 @@ A comprehensive system to scrape YouTube videos and store them in Backblaze B2 w
 - **Scalable Architecture**: Handle high volume with multiple workers
 - **Automatic Cleanup**: Videos deleted from server after cloud upload
 - **No API Keys**: Uses yt-dlp scraping instead of YouTube API
+- **Human-like Scraping**: Realistic headers, optional cookies, watch-time pacing, randomized delays
+- **Daily yt-dlp Updates**: Automatically updates yt-dlp to the latest version every day
 
 ## Architecture & Flow
 
@@ -179,6 +181,42 @@ You can configure the application in two ways:
 
 4. **Update environment variables in `.env`** (same values as GitHub secrets above)
 
+### Human-like Scraping Settings
+
+Set these optional variables to mimic a real browser session and user pacing:
+
+```bash
+# Realistic browser headers
+SCRAPER_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+SCRAPER_ACCEPT_LANGUAGE="en-US,en;q=0.9"
+
+# Cookies: either provide a cookies.txt or read from a browser profile
+YT_COOKIES_FILE=/path/to/cookies.txt              # Netscape format
+COOKIES_FROM_BROWSER=chrome                       # chrome|firefox|brave|edge
+
+# Watch-time pacing
+SIMULATE_WATCH_TIME=true                          # enable watch-like download rate
+WATCH_SPEED=1.25                                  # 1.0 = realtime, >1 faster than realtime
+HUMAN_DELAY_MIN_SEC=3.0                           # min delay between videos
+HUMAN_DELAY_MAX_SEC=10.0                          # max delay between videos
+
+# Optional hard cap (bytes/sec). If set, overrides watch-time derived rate
+DOWNLOAD_RATELIMIT_BPS=0
+```
+
+Notes:
+- If both `YT_COOKIES_FILE` and `COOKIES_FROM_BROWSER` are set, `YT_COOKIES_FILE` takes precedence.
+- When `SIMULATE_WATCH_TIME` is enabled, the downloader estimates a rate limit from filesize and duration or uses a resolution-based heuristic.
+
+### Daily yt-dlp Auto-Update
+
+- A scheduled task updates yt-dlp daily at 03:00 UTC.
+- No action needed if you run the bundled worker with beat (default in `start_worker.py`).
+- Manual run:
+  ```bash
+  celery -A tasks call update_yt_dlp
+  ```
+
 ## 🐳 **Docker Deployment (Uses Environment Variables)**
 
 ```bash
@@ -188,6 +226,8 @@ docker-compose up -d
 # Or with explicit variables
 SUPABASE_URL=your_url SUPABASE_KEY=your_key docker-compose up -d
 ```
+
+> Note: The bundled worker runs Celery beat automatically for scheduled tasks (no separate beat process needed).
 
 ## ☁️ **Cloud Deployment Examples**
 
@@ -239,13 +279,9 @@ Your server will automatically pull and deploy the latest code from GitHub! 🎯
 
 2. **Start Celery worker** (in a separate terminal):
    ```bash
-   celery -A tasks worker --loglevel=info
+   python start_worker.py
    ```
-
-3. **Start Celery beat** (optional, for scheduled tasks):
-   ```bash
-   celery -A tasks beat --loglevel=info
-   ```
+   This starts the worker and an embedded scheduler (Celery beat) for periodic tasks.
 
 ### Using the Web Interface
 

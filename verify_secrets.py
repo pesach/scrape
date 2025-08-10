@@ -99,7 +99,16 @@ def verify_local_config():
                 print("✅ Backblaze B2 client initialized")
             except Exception as e:
                 print(f"⚠️ B2 client issue: {str(e)}")
-                
+            
+            # Show scraper realism settings (non-sensitive)
+            try:
+                print("\n🎛️ Scraper realism settings:")
+                print(f"   simulate_watch_time: {summary.get('simulate_watch_time')}")
+                print(f"   watch_speed: {summary.get('watch_speed')}")
+                print(f"   cookies_file_set: {summary.get('cookies_file_set')}")
+                print(f"   cookies_from_browser: {summary.get('cookies_from_browser')}")
+            except Exception:
+                pass
         else:
             print(f"❌ Missing configuration: {', '.join(missing)}")
             print("💡 These should be set as GitHub Repository Secrets")
