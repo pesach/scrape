@@ -1,0 +1,78 @@
+2025-08-10 18:40:44,663 | INFO | root | req_id=- | 4864/MainThread | logging_config.py:105 setup_logging | Logging configured successfully
+2025-08-10 18:40:45,019 | ERROR | main | req_id=- | 4864/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
+2025-08-10 18:40:45,096 | INFO | main | req_id=- | 4864/MainThread | main.py:110 <module> | ✅ YouTube parser initialized
+2025-08-10 18:40:45,136 | WARNING | main | req_id=- | 4864/MainThread | main.py:121 <module> | ⚠️ Celery tasks not available: Invalid API key
+2025-08-10 18:40:45,254 | INFO | root | req_id=- | 4867/MainThread | logging_config.py:105 setup_logging | Logging configured successfully
+2025-08-10 18:40:45,527 | INFO | root | req_id=- | 4868/MainThread | logging_config.py:105 setup_logging | Logging configured successfully
+2025-08-10 18:40:45,615 | ERROR | main | req_id=- | 4868/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
+2025-08-10 18:40:45,687 | INFO | main | req_id=- | 4868/MainThread | main.py:110 <module> | ✅ YouTube parser initialized
+2025-08-10 18:40:45,720 | WARNING | main | req_id=- | 4868/MainThread | main.py:121 <module> | ⚠️ Celery tasks not available: Invalid API key
+2025-08-10 18:41:23,502 | INFO | root | req_id=- | 5228/MainThread | logging_config.py:105 setup_logging | Logging configured successfully
+2025-08-10 18:41:23,839 | ERROR | main | req_id=- | 5228/MainThread | main.py:102 <module> | ❌ Database initialization failed: Invalid API key
+Traceback (most recent call last):
+  File "/workspace/main.py", line 98, in <module>
+    from database import db as database_instance
+  File "/workspace/database.py", line 125, in <module>
+    db = Database()
+  File "/workspace/database.py", line 15, in __init__
+    self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+                            ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 295, in create_client
+    return SyncClient.create(
+           ~~~~~~~~~~~~~~~~~^
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 97, in create
+    client = cls(supabase_url, supabase_key, options)
+  File "/home/ubuntu/.local/lib/python3.13/site-packages/supabase/_sync/client.py", line 58, in __init__
+    raise SupabaseException("Invalid API key")
+supabase._sync.client.SupabaseException: Invalid API key
+2025-08-10 18:41:23,914 | INFO | main | req_id=- | 5228/MainThread | main.py:110 <module> | ✅ YouTube parser initialized
+2025-08-10 18:41:23,945 | WARNING | main | req_id=- | 5228/MainThread | main.py:121 <module> | ⚠️ Celery tasks not available: Invalid API key
+2025-08-10 18:41:23,957 | INFO | config | req_id=- | 5228/MainThread | config.py:124 validate | ✅ All required configuration present
+2025-08-10 18:41:28,139 | INFO | config | req_id=c2ac6983-2438-44b4-bfec-927f6f48a422 | 5228/MainThread | config.py:124 validate | ✅ All required configuration present
+2025-08-10 18:41:28,140 | INFO | main | req_id=c2ac6983-2438-44b4-bfec-927f6f48a422 | 5228/MainThread | main.py:69 add_request_id_and_timing | Request completed: GET /health status=200 duration_ms=0 ua=curl/8.12.1
+2025-08-10 18:42:00,227 | INFO | root | req_id=- | 5549/MainThread | logging_config.py:105 setup_logging | Logging configured successfully
+2025-08-10 18:42:00,283 | INFO | __main__ | req_id=- | 5549/MainThread | start_worker.py:40 <module> | ✅ Connected to Redis at redis://localhost:6379/0
