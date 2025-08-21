@@ -30,6 +30,7 @@ from models import (
     YouTubeURLCreate, YouTubeURLResponse, ScrapingJobResponse, 
     VideoResponse, URLType, JobStatus
 )
+from youtube_parser import YouTubeURLParser
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,15 @@ async def submit_url(url_data: YouTubeURLCreate, request: Request):
                 logger.info(f"✅ Extracted metadata for {normalized_url}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not extract metadata for {normalized_url}: {str(e)}")
+                # If cookies are configured, proactively probe with just cookies to provide actionable diagnostics
+                try:
+                    from youtube_parser import YouTubeURLParser as _ProbeParser
+                    probe = _ProbeParser.probe_with_cookies(normalized_url)
+                    logger.info("Cookie probe: success=%s details=%s", probe.get('success'), probe.get('cookies'))
+                    if not probe.get('success'):
+                        logger.warning("Cookie probe failed: %s", probe.get('error'))
+                except Exception as probe_err:
+                    logger.debug("Cookie probe raised exception: %s", str(probe_err))
                 # Continue without metadata - we can still create the URL entry
                 # This graceful degradation ensures system keeps working even if metadata fails
             
@@ -499,6 +509,16 @@ async def queue_status():
         return {"error": "Queue monitoring not available"}
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/api/debug/probe-cookies", response_model=dict)
+async def probe_cookies(url_data: YouTubeURLCreate):
+    """Try yt-dlp against a single URL using configured cookies and return diagnostics."""
+    try:
+        probe = YouTubeURLParser.probe_with_cookies(url_data.url)
+        return probe
+    except Exception as e:
+        logger.exception("Cookie probe failed: %s", str(e))
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
