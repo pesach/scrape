@@ -5,6 +5,31 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _get_first_env(names, default_value=""):
+    """
+    Return the first non-empty environment variable from the provided list.
+    """
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return default_value
+
+def _resolve_path_maybe_relative(path_str: str) -> str:
+    """
+    Expand user and env vars and resolve relative paths to project root.
+    Return the resolved string path (even if it doesn't exist).
+    """
+    if not path_str:
+        return ""
+    expanded = os.path.expandvars(os.path.expanduser(path_str))
+    p = Path(expanded)
+    if not p.is_absolute():
+        # Resolve relative to repo root (this file's parent directory)
+        repo_root = Path(__file__).parent
+        p = (repo_root / p).resolve()
+    return str(p)
+
 def load_config():
     """
     Load configuration from multiple sources in priority order:
@@ -69,8 +94,20 @@ class Config:
     SCRAPER_ACCEPT_LANGUAGE: str = os.getenv("SCRAPER_ACCEPT_LANGUAGE", "en-US,en;q=0.9")
 
     # Cookies: provide either a cookies.txt file or a browser name for cookiesfrombrowser
-    YT_COOKIES_FILE: str = os.getenv("YT_COOKIES_FILE", "")  # Path to Netscape cookies.txt
-    COOKIES_FROM_BROWSER: str = os.getenv("COOKIES_FROM_BROWSER", "")  # e.g., chrome|firefox|brave|edge
+    # Accept common fallback env names for convenience
+    _RAW_COOKIES_FILE: str = _get_first_env([
+        "YT_COOKIES_FILE",
+        "COOKIES_FILE",
+        "COOKIES",
+        "COOKIES_TXT",
+        "COOKIEFILE",
+    ], "")
+    YT_COOKIES_FILE: str = _resolve_path_maybe_relative(_RAW_COOKIES_FILE)  # Path to Netscape cookies.txt
+    COOKIES_FROM_BROWSER: str = _get_first_env([
+        "COOKIES_FROM_BROWSER",
+        "COOKIES_BROWSER",
+        "BROWSER_COOKIES",
+    ], "")  # e.g., chrome|firefox|brave|edge
 
     # Pacing
     SIMULATE_WATCH_TIME: bool = os.getenv("SIMULATE_WATCH_TIME", "false").lower() in ("true", "1", "yes")
@@ -160,3 +197,19 @@ if not is_valid:
         raise ValueError(f"Missing required configuration in production: {', '.join(missing)}")
 else:
     logger.info("🎉 Configuration loaded successfully")
+
+# Log cookies configuration clarity at startup
+try:
+    if config.YT_COOKIES_FILE:
+        cookies_path = Path(config.YT_COOKIES_FILE)
+        if cookies_path.exists():
+            logger.info(f"🍪 Using cookies file at: {cookies_path}")
+        else:
+            logger.warning(f"🍪 Cookies file is set but was not found: {cookies_path}")
+    elif config.COOKIES_FROM_BROWSER:
+        logger.info(f"🍪 Using cookies from browser: {config.COOKIES_FROM_BROWSER}")
+    else:
+        logger.info("🍪 No cookies configuration provided. Proceeding without cookies.")
+except Exception:
+    # Avoid breaking startup due to logging issues
+    pass

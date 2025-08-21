@@ -77,10 +77,20 @@ class VideoScraper:
         }
         # Cookies
         if self.config.YT_COOKIES_FILE:
+            # Log which cookies file is being used and whether it exists
+            try:
+                cookies_path = Path(self.config.YT_COOKIES_FILE)
+                if cookies_path.exists():
+                    logger.info("Using cookies file: %s", cookies_path)
+                else:
+                    logger.warning("Cookies file set but not found: %s", cookies_path)
+            except Exception:
+                pass
             opts['cookiefile'] = self.config.YT_COOKIES_FILE
         elif self.config.COOKIES_FROM_BROWSER:
             # e.g., ('chrome',) or ('firefox',)
             browser = self.config.COOKIES_FROM_BROWSER.strip().lower()
+            logger.info("Using cookies from browser: %s", browser)
             opts['cookiesfrombrowser'] = (browser, )
         
         # Request pacing inside yt-dlp
