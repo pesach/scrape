@@ -1,13 +1,18 @@
 import os
 from typing import Optional, List, Dict, Any
 from supabase import create_client, Client
-from models import URLType, JobStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
 import uuid
+import re
+import json
 from datetime import datetime, date
+
+from postgrest.exceptions import APIError
+from supabase import create_client, Client
+from models import URLType, JobStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
+from config import config
 
 class Database:
     def __init__(self):
-        from config import config
         
         if not config.SUPABASE_URL or not config.SUPABASE_KEY:
             raise ValueError("SUPABASE_URL and SUPABASE_KEY must be configured")
@@ -49,7 +54,7 @@ class Database:
         """
         payload: Dict[str, Any] = dict(video_data)  # shallow copy
 
-        # 1) Serialize datetime/date objects to ISO strings
+        # 1) Serialize datetime/date objects to ISO strings, coerce non-serializable
         for k, v in list(payload.items()):
             if isinstance(v, (datetime, date)):
                 payload[k] = v.isoformat()
@@ -59,7 +64,7 @@ class Database:
                 except Exception:
                     payload[k] = str(v)
 
-        # 2) Remove keys with None values
+        # 2) Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
 
         max_retries = 20
@@ -72,9 +77,9 @@ class Database:
                     return VideoResponse(**result.data[0])
                 raise Exception("Insert returned no data")
             except APIError as e:
+                # Detect missing column from error message
                 msg_obj = e.args[0] if e.args else str(e)
                 msg = msg_obj if isinstance(msg_obj, str) else json.dumps(msg_obj)
-                # Detect missing column
                 m = re.search(r"Could not find the '([^']+)' column", msg)
                 if m:
                     bad_col = m.group(1)
@@ -84,7 +89,7 @@ class Database:
                         continue
                 raise
             except TypeError:
-                # Coerce problematic values to string
+                # Coerce remaining problematic values to string
                 for k, v in list(payload.items()):
                     try:
                         json.dumps(v)
