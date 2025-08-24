@@ -191,6 +191,8 @@ class VideoScraper:
             opts['ratelimit'] = ratelimit_bps
             logger.debug(f"Using ratelimit {ratelimit_bps} B/s to simulate watch-time")
         
+        opts.pop('ratelimit', None)  # Remove the speed limit
+        
         return opts
     
     def extract_video_info(self, url: str) -> Dict[str, Any]:

@@ -54,6 +54,9 @@ class Database:
         """
         payload: Dict[str, Any] = dict(video_data)  # shallow copy
 
+            # Set default for required columns
+        if "videourl" not in payload or not payload["videourl"]:
+            payload["videourl"] = "videos/default.mp4"  # <-- default value
         # 1) Serialize datetime/date objects to ISO strings, coerce non-serializable
         for k, v in list(payload.items()):
             if isinstance(v, (datetime, date)):
