@@ -14,19 +14,73 @@ class Database:
         
         self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
     
-    async def create_youtube_url(self, url: str, url_type: URLType, title: str = None, description: str = None) -> YouTubeURLResponse:
-        """Create a new YouTube URL entry"""
-        data = {
-            "url": url,
-            "url_type": url_type.value,
-            "title": title,
-            "description": description
-        }
-        
-        result = self.supabase.table("youtube_urls").insert(data).execute()
-        if result.data:
-            return YouTubeURLResponse(**result.data[0])
-        raise Exception("Failed to create YouTube URL entry")
+    async def create_video(self, video_data: Dict[str, Any]) -> VideoResponse:
+        """
+        Create a new video entry.
+        - Serializes datetime/date to ISO strings
+        - Removes None values
+        - If PostgREST complains about unknown columns, removes them and retries
+        """
+        # Make a shallow copy (don't mutate caller's dict)
+        payload = dict(video_data)
+
+        # 1) Serialize datetime/date objects to ISO format
+        for k, v in list(payload.items()):
+            if isinstance(v, (datetime, date)):
+                payload[k] = v.isoformat()
+            # Optionally convert non-serializables to str to avoid JSON errors
+            # (you can remove this if you prefer strict typing)
+            elif not isinstance(v, (str, int, float, bool, list, dict, type(None))):
+                try:
+                    payload[k] = str(v)
+                except Exception:
+                    payload.pop(k)
+
+        # 2) Remove keys with None values
+        payload = {k: v for k, v in payload.items() if v is not None}
+
+        # 3) Try insert and on PGRST204 remove unknown columns and retry
+        max_retries = 10
+        retries = 0
+        while retries < max_retries:
+            try:
+                result = self.supabase.table("videos").insert(payload).execute()
+                if result.data:
+                    return VideoResponse(**result.data[0])
+                # If result.data is empty but no exception, raise to surface the issue
+                raise Exception("Insert returned no data")
+            except APIError as e:
+                # Try to parse which column is missing from the message
+                # Example message: "Could not find the 'thumbnail_url' column of 'videos' in the schema cache"
+                msg = ""
+                if e.args:
+                    msg = e.args[0] if isinstance(e.args[0], str) else str(e.args)
+                else:
+                    msg = str(e)
+                m = re.search(r"Could not find the '([^']+)' column", msg)
+                if m:
+                    bad_col = m.group(1)
+                    if bad_col in payload:
+                        payload.pop(bad_col)
+                        retries += 1
+                        continue
+                # If we can't detect a missing column, re-raise the APIError
+                raise
+            except TypeError as e:
+                # JSON serialization error (should be rare because we attempted conversion above)
+                # As a fallback, coerce remaining problematic values to str and retry once
+                for k, v in list(payload.items()):
+                    try:
+                        # try serializing via json
+                        import json
+                        json.dumps(v)
+                    except Exception:
+                        payload[k] = str(v)
+                retries += 1
+                continue
+
+        raise Exception("Failed to insert video after removing unknown columns")
+
     
     async def get_youtube_url(self, url_id: uuid.UUID) -> Optional[YouTubeURLResponse]:
         """Get a YouTube URL by ID"""
