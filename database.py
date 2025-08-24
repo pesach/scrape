@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from supabase import create_client, Client
 from models import URLType, JobStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 class Database:
     def __init__(self):
