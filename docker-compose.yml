@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web application
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # These can be set via:
+      # 1. .env file (for local development)
+      # 2. Environment variables (for production)
+      # 3. Docker secrets (for production)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - B2_APPLICATION_KEY_ID=${B2_APPLICATION_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_ENDPOINT_URL=${B2_ENDPOINT_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - DOWNLOAD_PATH=/tmp/youtube_downloads
+      - MAX_FILE_SIZE_GB=5
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Celery worker
+  worker:
+    build: .
+    command: python start_worker.py
+    environment:
+      # Same environment variables as web service
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - B2_APPLICATION_KEY_ID=${B2_APPLICATION_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_ENDPOINT_URL=${B2_ENDPOINT_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - DOWNLOAD_PATH=/tmp/youtube_downloads
+      - MAX_FILE_SIZE_GB=5
+      - ENVIRONMENT=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - /tmp/youtube_downloads:/tmp/youtube_downloads
+    restart: unless-stopped
+
+# For production, you can use Docker secrets instead:
+# secrets:
+#   supabase_url:
+#     external: true
+#   supabase_key:
+#     external: true
+#   # ... other secrets

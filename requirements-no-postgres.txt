@@ -1,4 +1,3 @@
-requests>=2.31.0
 fastapi==0.104.1
 uvicorn==0.24.0
 yt-dlp==2023.12.30
@@ -13,7 +12,6 @@ aiofiles==23.2.0
 python-dotenv==1.0.0
 requests==2.31.0
 sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
 flask==3.0.0
-beautifulsoup4==4.12.2
-lxml==4.9.3
+# Note: psycopg2-binary removed - Supabase client handles PostgreSQL connections internally
+# python-dotenv is included for .env file support
