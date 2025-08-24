@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Test - YouTube Video Buttons</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .demo-info {
+            background: #f0f9ff;
+            border-left: 4px solid #3182ce;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+        .link-item {
+            background: #f7f9fc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .link-info {
+            flex: 1;
+        }
+        .link-url {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        .link-meta {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        .link-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .link-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .redownload-btn {
+            background: #4299e1;
+            color: white;
+        }
+        .redownload-btn:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .reupload-btn {
+            background: #48bb78;
+            color: white;
+        }
+        .reupload-btn:hover {
+            background: #38a169;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .settings-btn {
+            background: #805ad5;
+            color: white;
+        }
+        .settings-btn:hover {
+            background: #6b46c1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .remove-btn {
+            background: #f56565;
+            color: white;
+        }
+        .remove-btn:hover {
+            background: #e53e3e;
+        }
+        .highlight {
+            background: #fef5e7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 YouTube Video Management Dashboard</h1>
+        
+        <div class="demo-info">
+            <h3>✨ New Features Available!</h3>
+            <p>The dashboard now includes <span class="highlight">Re-download</span> and <span class="highlight">Re-upload</span> buttons for all YouTube videos.</p>
+            <p>These buttons appear automatically when a YouTube URL is detected in your links list.</p>
+        </div>
+
+        <h2>Sample YouTube Videos with Action Buttons:</h2>
+        
+        <!-- Sample YouTube Video 1 -->
+        <div class="link-item">
+            <div class="link-info">
+                <div class="link-url">https://www.youtube.com/watch?v=dQw4w9WgXcQ</div>
+                <div class="link-meta">
+                    <span>Status: completed</span> • 
+                    <span>Added: 2024-01-15 10:30:00</span> • 
+                    <span>Video Title: Sample Video 1</span>
+                </div>
+            </div>
+            <div class="link-actions">
+                <button class="link-btn redownload-btn" onclick="alert('Re-downloading video from YouTube...')">
+                    📥 Re-download
+                </button>
+                <button class="link-btn reupload-btn" onclick="alert('Re-uploading video to Backblaze...')">
+                    ☁️ Re-upload
+                </button>
+                <button class="link-btn settings-btn" onclick="alert('Opening video settings...')">
+                    ⚙️ Settings
+                </button>
+                <button class="link-btn remove-btn" onclick="alert('Removing video...')">
+                    🗑️ Remove
+                </button>
+            </div>
+        </div>
+
+        <!-- Sample YouTube Video 2 -->
+        <div class="link-item">
+            <div class="link-info">
+                <div class="link-url">https://youtu.be/jNQXAC9IVRw</div>
+                <div class="link-meta">
+                    <span>Status: completed</span> • 
+                    <span>Added: 2024-01-15 11:45:00</span> • 
+                    <span>Video Title: Sample Video 2</span>
+                </div>
+            </div>
+            <div class="link-actions">
+                <button class="link-btn redownload-btn" onclick="alert('Re-downloading video from YouTube...')">
+                    📥 Re-download
+                </button>
+                <button class="link-btn reupload-btn" onclick="alert('Re-uploading video to Backblaze...')">
+                    ☁️ Re-upload
+                </button>
+                <button class="link-btn settings-btn" onclick="alert('Opening video settings...')">
+                    ⚙️ Settings
+                </button>
+                <button class="link-btn remove-btn" onclick="alert('Removing video...')">
+                    🗑️ Remove
+                </button>
+            </div>
+        </div>
+
+        <!-- Sample Regular Link (non-YouTube) -->
+        <div class="link-item">
+            <div class="link-info">
+                <div class="link-url">https://example.com/some-article</div>
+                <div class="link-meta">
+                    <span>Status: completed</span> • 
+                    <span>Added: 2024-01-15 12:00:00</span> • 
+                    <span>Regular Link (No video buttons)</span>
+                </div>
+            </div>
+            <div class="link-actions">
+                <button class="link-btn remove-btn" onclick="alert('Removing link...')">
+                    🗑️ Remove
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #e6fffa; border-radius: 8px;">
+            <h3>📝 How It Works:</h3>
+            <ul style="margin-left: 20px; line-height: 1.8;">
+                <li><strong>Re-download Button (📥):</strong> Downloads the video again from YouTube to get the latest version</li>
+                <li><strong>Re-upload Button (☁️):</strong> Uploads the video to Backblaze B2 storage</li>
+                <li><strong>Settings Button (⚙️):</strong> Configure video-specific settings like database ID</li>
+                <li><strong>Automatic Detection:</strong> These buttons only appear for YouTube URLs (youtube.com or youtu.be)</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
