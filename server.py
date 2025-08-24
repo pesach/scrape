@@ -8,6 +8,9 @@ import http.server
 import socketserver
 import json
 import os
+import sqlite3
+import uuid
+from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import mimetypes
 import sys
@@ -15,6 +18,25 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from video_handler import VideoHandler
 
 PORT = 8080
+DB_FILE = 'links.db'
+
+def init_database():
+    """Initialize the SQLite database with the links table"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS links (
+            id TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            addedAt TEXT NOT NULL,
+            fetchedAt TEXT,
+            attempts INTEGER DEFAULT 0,
+            backblazeUrl TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     """Custom HTTP handler for the dashboard"""
@@ -29,27 +51,33 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         """Handle GET requests"""
         parsed_path = urlparse(self.path)
         
-        # Serve the dashboard at root
-        if parsed_path.path == '/':
-            self.path = '/dashboard.html'
-        
-        # API endpoint to get links
+        # API endpoint to get all links
         if parsed_path.path == '/api/links':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             
-            # Sample response (in a real app, this would come from a database)
-            links = [
-                {
-                    "id": "link_1",
-                    "url": "https://api.example.com/data",
-                    "status": "pending",
-                    "addedAt": "2024-01-01T12:00:00Z",
-                    "attempts": 0
-                }
-            ]
+            # Get links from database
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM links ORDER BY addedAt DESC')
+            rows = cursor.fetchall()
+            conn.close()
+            
+            # Convert to list of dictionaries
+            links = []
+            for row in rows:
+                links.append({
+                    "id": row[0],
+                    "url": row[1],
+                    "status": row[2],
+                    "addedAt": row[3],
+                    "fetchedAt": row[4],
+                    "attempts": row[5],
+                    "backblazeUrl": row[6]
+                })
+            
             self.wfile.write(json.dumps(links).encode())
             return
         
@@ -59,6 +87,48 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests"""
         parsed_path = urlparse(self.path)
+        
+        # API endpoint to add a new link
+        if parsed_path.path == '/api/links':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data)
+                url = data.get('url')
+                
+                if not url:
+                    self.send_error(400, "URL is required")
+                    return
+                
+                # Generate unique ID and timestamp
+                link_id = f"link_{uuid.uuid4().int}"
+                added_at = datetime.now().isoformat()
+                
+                # Insert into database
+                conn = sqlite3.connect(DB_FILE)
+                cursor = conn.cursor()
+                cursor.execute(
+                    'INSERT INTO links (id, url, status, addedAt, attempts) VALUES (?, ?, ?, ?, ?)',
+                    (link_id, url, 'pending', added_at, 0)
+                )
+                conn.commit()
+                conn.close()
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "success": True,
+                    "message": f"Link added: {url}",
+                    "id": link_id
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.send_error(500, str(e))
+            return
         
         # API endpoint to fetch a link
         if parsed_path.path == '/api/fetch':
@@ -79,30 +149,6 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     "success": True,
                     "message": f"Link {link_id} fetched successfully",
                     "data": {"sample": "data"}
-                }
-                self.wfile.write(json.dumps(response).encode())
-            except Exception as e:
-                self.send_error(400, str(e))
-            return
-        
-        # API endpoint to add a new link
-        if parsed_path.path == '/api/links':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            
-            try:
-                data = json.loads(post_data)
-                url = data.get('url')
-                
-                self.send_response(201)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                
-                response = {
-                    "success": True,
-                    "message": f"Link added: {url}",
-                    "id": f"link_{hash(url)}"
                 }
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
