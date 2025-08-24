@@ -41,8 +41,22 @@ class Database:
         return [YouTubeURLResponse(**item) for item in result.data or []]
     
     async def create_video(self, video_data: Dict[str, Any]) -> VideoResponse:
-        """Create a new video entry"""
-        result = self.supabase.table("videos").insert(video_data).execute()
+        """Create a new video entry, filtering out unknown columns."""
+        allowed_columns = [
+            "youtube_id", "url", "title", "description",
+            "duration", "view_count", "upload_date", "uploader",
+            "uploader_id", "thumbnail_url", "tags", "categories",
+            "resolution", "fps", "format_id", "file_size",
+            "b2_file_key", "b2_file_url"
+        ]
+        filtered_data = {k: v for k, v in video_data.items() if k in allowed_columns}
+
+        # Convert any datetime/date objects to ISO strings
+        for k, v in filtered_data.items():
+            if isinstance(v, (datetime, date)):
+                filtered_data[k] = v.isoformat()
+
+        result = self.supabase.table("videos").insert(filtered_data).execute()
         if result.data:
             return VideoResponse(**result.data[0])
         raise Exception("Failed to create video entry")
