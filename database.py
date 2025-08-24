@@ -1,5 +1,9 @@
 import os
 from typing import Optional, List, Dict, Any
+import re
+import json
+from postgrest.exceptions import APIError
+from typing import Dict, Any
 from supabase import create_client, Client
 from models import URLType, JobStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
 import uuid
@@ -19,67 +23,70 @@ class Database:
         Create a new video entry.
         - Serializes datetime/date to ISO strings
         - Removes None values
-        - If PostgREST complains about unknown columns, removes them and retries
+        - If PostgREST complains about unknown columns (PGRST204), removes them and retries
         """
-        # Make a shallow copy (don't mutate caller's dict)
-        payload = dict(video_data)
+        # Work on a shallow copy so caller's dict isn't mutated
+        payload: Dict[str, Any] = dict(video_data)
 
         # 1) Serialize datetime/date objects to ISO format
         for k, v in list(payload.items()):
             if isinstance(v, (datetime, date)):
                 payload[k] = v.isoformat()
-            # Optionally convert non-serializables to str to avoid JSON errors
-            # (you can remove this if you prefer strict typing)
+            # If value is not basic JSON type, try to coerce or stringify
             elif not isinstance(v, (str, int, float, bool, list, dict, type(None))):
                 try:
-                    payload[k] = str(v)
+                    # Try JSON-dumping to detect non-serializable types
+                    json.dumps(v)
                 except Exception:
-                    payload.pop(k)
+                    # Last-resort: convert to string
+                    try:
+                        payload[k] = str(v)
+                    except Exception:
+                        payload.pop(k, None)
 
         # 2) Remove keys with None values
         payload = {k: v for k, v in payload.items() if v is not None}
 
-        # 3) Try insert and on PGRST204 remove unknown columns and retry
-        max_retries = 10
-        retries = 0
-        while retries < max_retries:
+        # 3) Try insert and handle PGRST204 unknown column errors by removing offending columns
+        max_retries = 20
+        attempt = 0
+        while attempt < max_retries and payload:
             try:
                 result = self.supabase.table("videos").insert(payload).execute()
                 if result.data:
                     return VideoResponse(**result.data[0])
-                # If result.data is empty but no exception, raise to surface the issue
+                # If no exception but no data returned, surface an error
                 raise Exception("Insert returned no data")
             except APIError as e:
-                # Try to parse which column is missing from the message
+                # Try to parse which column is missing from the error message.
                 # Example message: "Could not find the 'thumbnail_url' column of 'videos' in the schema cache"
-                msg = ""
-                if e.args:
-                    msg = e.args[0] if isinstance(e.args[0], str) else str(e.args)
-                else:
-                    msg = str(e)
+                msg_obj = e.args[0] if e.args else str(e)
+                msg = msg_obj if isinstance(msg_obj, str) else json.dumps(msg_obj)
                 m = re.search(r"Could not find the '([^']+)' column", msg)
                 if m:
                     bad_col = m.group(1)
                     if bad_col in payload:
-                        payload.pop(bad_col)
-                        retries += 1
+                        # remove unknown column and retry
+                        payload.pop(bad_col, None)
+                        attempt += 1
                         continue
-                # If we can't detect a missing column, re-raise the APIError
+                # If we can't detect missing column, re-raise for visibility
                 raise
-            except TypeError as e:
-                # JSON serialization error (should be rare because we attempted conversion above)
-                # As a fallback, coerce remaining problematic values to str and retry once
+            except TypeError:
+                # JSON serialization error despite earlier attempts: coerce remaining problematic values to str then retry once
                 for k, v in list(payload.items()):
                     try:
-                        # try serializing via json
-                        import json
                         json.dumps(v)
                     except Exception:
                         payload[k] = str(v)
-                retries += 1
+                attempt += 1
                 continue
+            except Exception:
+                # Unknown failure — re-raise so caller can see it
+                raise
 
-        raise Exception("Failed to insert video after removing unknown columns")
+        raise Exception("Failed to insert video after removing unknown columns or payload became empty")
+
 
     
     async def get_youtube_url(self, url_id: uuid.UUID) -> Optional[YouTubeURLResponse]:
