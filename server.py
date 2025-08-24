@@ -10,6 +10,9 @@ import json
 import os
 from urllib.parse import urlparse, parse_qs
 import mimetypes
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from video_handler import VideoHandler
 
 PORT = 8080
 
@@ -19,6 +22,8 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         # Set the directory to serve files from
         super().__init__(*args, directory=os.path.dirname(os.path.abspath(__file__)), **kwargs)
+        # Initialize video handler
+        self.video_handler = VideoHandler()
     
     def do_GET(self):
         """Handle GET requests"""
@@ -100,6 +105,84 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     "id": f"link_{hash(url)}"
                 }
                 self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.send_error(400, str(e))
+            return
+        
+        # API endpoint to re-download video from YouTube
+        if parsed_path.path == '/api/video/redownload':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data)
+                youtube_url = data.get('youtube_url')
+                
+                if not youtube_url:
+                    raise ValueError("YouTube URL is required")
+                
+                # Download video
+                result = self.video_handler.download_youtube_video(youtube_url)
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                self.wfile.write(json.dumps(result).encode())
+            except Exception as e:
+                self.send_error(400, str(e))
+            return
+        
+        # API endpoint to re-upload video to Backblaze
+        if parsed_path.path == '/api/video/reupload':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data)
+                file_path = data.get('file_path')
+                remote_name = data.get('remote_name')
+                
+                if not file_path:
+                    raise ValueError("File path is required")
+                
+                # Upload to Backblaze
+                result = self.video_handler.upload_to_backblaze(file_path, remote_name)
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                self.wfile.write(json.dumps(result).encode())
+            except Exception as e:
+                self.send_error(400, str(e))
+            return
+        
+        # API endpoint for complete video re-processing
+        if parsed_path.path == '/api/video/reprocess':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data)
+                youtube_url = data.get('youtube_url')
+                video_id = data.get('video_id')
+                table_name = data.get('table_name', 'videos')
+                
+                if not youtube_url or not video_id:
+                    raise ValueError("YouTube URL and video ID are required")
+                
+                # Process complete re-upload workflow
+                result = self.video_handler.process_video_reupload(youtube_url, video_id, table_name)
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                self.wfile.write(json.dumps(result).encode())
             except Exception as e:
                 self.send_error(400, str(e))
             return

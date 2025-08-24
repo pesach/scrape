@@ -261,6 +261,33 @@
             background: #ff5252;
         }
 
+        .redownload-btn {
+            background: #4299e1;
+            color: white;
+        }
+
+        .redownload-btn:hover {
+            background: #3182ce;
+        }
+
+        .reupload-btn {
+            background: #48bb78;
+            color: white;
+        }
+
+        .reupload-btn:hover {
+            background: #38a169;
+        }
+
+        .settings-btn {
+            background: #805ad5;
+            color: white;
+        }
+
+        .settings-btn:hover {
+            background: #6b46c1;
+        }
+
         .spinner {
             display: inline-block;
             width: 16px;
@@ -467,6 +494,25 @@
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
+
+    <!-- Video Settings Modal -->
+    <div id="videoSettingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Video Settings</h2>
+            <div class="form-group">
+                <label for="videoDatabaseId">Database Video ID:</label>
+                <input type="text" id="videoDatabaseId" placeholder="Enter the video ID from Supabase">
+            </div>
+            <div class="form-group">
+                <label for="videoTableName">Table Name (optional):</label>
+                <input type="text" id="videoTableName" placeholder="videos (default)">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeVideoSettingsModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveVideoSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
 
     <script src="dashboard.js"></script>
 </body>
