@@ -8,94 +8,48 @@ import http.server
 import socketserver
 import json
 import os
-import uuid
-from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import mimetypes
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from video_handler import VideoHandler
-from supabase import create_client, Client
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 PORT = 8080
-
-# Initialize Supabase client globally
-SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY')
-if SUPABASE_URL and SUPABASE_KEY:
-    SUPABASE_CLIENT = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Supabase client initialized successfully")
-else:
-    print("⚠️ Warning: Supabase credentials not found. Database features will be limited.")
-    SUPABASE_CLIENT = None
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     """Custom HTTP handler for the dashboard"""
     
     def __init__(self, *args, **kwargs):
-        # Initialize video handler
-        self.video_handler = VideoHandler()
         # Set the directory to serve files from
         super().__init__(*args, directory=os.path.dirname(os.path.abspath(__file__)), **kwargs)
+        # Initialize video handler
+        self.video_handler = VideoHandler()
     
     def do_GET(self):
         """Handle GET requests"""
         parsed_path = urlparse(self.path)
         
-        # API endpoint to get all links/videos
+        # Serve the dashboard at root
+        if parsed_path.path == '/':
+            self.path = '/dashboard.html'
+        
+        # API endpoint to get links
         if parsed_path.path == '/api/links':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             
-            links = []
-            
-            if SUPABASE_CLIENT:
-                try:
-                    # Get videos from Supabase 'videos' table
-                    response = SUPABASE_CLIENT.table('videos').select('*').order('created_at', desc=True).execute()
-                    
-                    if response.data:
-                        for video in response.data:
-                            # Convert Supabase video format to dashboard link format
-                            links.append({
-                                "id": video.get('id', ''),
-                                "url": video.get('youtube_url', ''),
-                                "status": "completed" if video.get('url') else "pending",
-                                "addedAt": video.get('created_at', ''),
-                                "fetchedAt": video.get('updated_at'),
-                                "attempts": 1,  # Default value
-                                "backblazeUrl": video.get('url', ''),  # 'url' field contains the Backblaze URL
-                                "title": video.get('title', ''),
-                                "description": video.get('description', ''),
-                                "duration": video.get('duration'),
-                                "views": video.get('views'),
-                                "likes": video.get('likes')
-                            })
-                except Exception as e:
-                    print(f"Error fetching from Supabase: {e}")
-                    # Return empty list on error
-                    links = []
-            else:
-                # Return sample data if Supabase is not configured
-                links = [
-                    {
-                        "id": "sample_1",
-                        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                        "status": "completed",
-                        "addedAt": datetime.now().isoformat(),
-                        "fetchedAt": datetime.now().isoformat(),
-                        "attempts": 1,
-                        "backblazeUrl": "https://example.backblaze.com/video.mp4",
-                        "title": "Sample YouTube Video"
-                    }
-                ]
-            
+            # Sample response (in a real app, this would come from a database)
+            links = [
+                {
+                    "id": "link_1",
+                    "url": "https://api.example.com/data",
+                    "status": "pending",
+                    "addedAt": "2024-01-01T12:00:00Z",
+                    "attempts": 0
+                }
+            ]
             self.wfile.write(json.dumps(links).encode())
             return
         
@@ -105,61 +59,6 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests"""
         parsed_path = urlparse(self.path)
-        
-        # API endpoint to add a new link/video
-        if parsed_path.path == '/api/links':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            
-            try:
-                data = json.loads(post_data)
-                url = data.get('url')
-                
-                if not url:
-                    self.send_error(400, "URL is required")
-                    return
-                
-                link_id = f"link_{uuid.uuid4()}"
-                
-                if SUPABASE_CLIENT:
-                    try:
-                        # Extract video ID from YouTube URL
-                        video_id = None
-                        if 'youtube.com/watch?v=' in url:
-                            video_id = url.split('v=')[1].split('&')[0]
-                        elif 'youtu.be/' in url:
-                            video_id = url.split('youtu.be/')[1].split('?')[0]
-                        
-                        # Insert into Supabase 'videos' table
-                        video_data = {
-                            'youtube_url': url,
-                            'youtube_id': video_id,
-                            'title': f'Video from {url}',
-                            'status': 'pending'
-                        }
-                        
-                        response = SUPABASE_CLIENT.table('videos').insert(video_data).execute()
-                        
-                        if response.data and len(response.data) > 0:
-                            link_id = response.data[0].get('id', link_id)
-                    except Exception as e:
-                        print(f"Error inserting into Supabase: {e}")
-                        # Continue with the response even if database insert fails
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                
-                response = {
-                    "success": True,
-                    "message": f"Link added: {url}",
-                    "id": link_id
-                }
-                self.wfile.write(json.dumps(response).encode())
-            except Exception as e:
-                self.send_error(500, str(e))
-            return
         
         # API endpoint to fetch a link
         if parsed_path.path == '/api/fetch':
@@ -180,6 +79,30 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     "success": True,
                     "message": f"Link {link_id} fetched successfully",
                     "data": {"sample": "data"}
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                self.send_error(400, str(e))
+            return
+        
+        # API endpoint to add a new link
+        if parsed_path.path == '/api/links':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data)
+                url = data.get('url')
+                
+                self.send_response(201)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "success": True,
+                    "message": f"Link added: {url}",
+                    "id": f"link_{hash(url)}"
                 }
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
