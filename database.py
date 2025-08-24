@@ -46,18 +46,15 @@ class Database:
         return [YouTubeURLResponse(**item) for item in result.data or []]
     
     async def create_video(self, video_data: Dict[str, Any]) -> VideoResponse:
-        """
-        Create a new video entry.
-        - Serializes datetime/date to ISO strings
-        - Removes None values
-        - Dynamically removes unknown columns if PostgREST complains (PGRST204)
-        """
-        payload: Dict[str, Any] = dict(video_data)  # shallow copy
+        payload: Dict[str, Any] = dict(video_data)
 
-            # Set default for required columns
-        if "videourl" not in payload or not payload["videourl"]:
-            payload["videourl"] = "videos/default.mp4"  # <-- default value
-        # 1) Serialize datetime/date objects to ISO strings, coerce non-serializable
+        # Set defaults for required fields
+        payload.setdefault("videourl", "videos/default.mp4")
+        payload.setdefault("url", f"https://www.youtube.com/watch?v={payload.get('youtube_id', 'unknown')}")
+        payload.setdefault("created_at", datetime.utcnow().isoformat())
+        payload.setdefault("updated_at", datetime.utcnow().isoformat())
+
+        # Serialize datetime/date objects and coerce non-serializable types
         for k, v in list(payload.items()):
             if isinstance(v, (datetime, date)):
                 payload[k] = v.isoformat()
@@ -67,7 +64,7 @@ class Database:
                 except Exception:
                     payload[k] = str(v)
 
-        # 2) Remove None values
+        # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
 
         max_retries = 20
@@ -80,7 +77,6 @@ class Database:
                     return VideoResponse(**result.data[0])
                 raise Exception("Insert returned no data")
             except APIError as e:
-                # Detect missing column from error message
                 msg_obj = e.args[0] if e.args else str(e)
                 msg = msg_obj if isinstance(msg_obj, str) else json.dumps(msg_obj)
                 m = re.search(r"Could not find the '([^']+)' column", msg)
@@ -92,7 +88,6 @@ class Database:
                         continue
                 raise
             except TypeError:
-                # Coerce remaining problematic values to string
                 for k, v in list(payload.items()):
                     try:
                         json.dumps(v)
