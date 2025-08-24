@@ -93,7 +93,9 @@ function renderLinks() {
         return;
     }
     
-    linksList.innerHTML = filteredLinks.map(link => `
+    linksList.innerHTML = filteredLinks.map(link => {
+        const isYouTubeVideo = link.url && (link.url.includes('youtube.com') || link.url.includes('youtu.be'));
+        return `
         <div class="link-item ${link.status}" id="link-${link.id}">
             <div class="link-info">
                 <div class="link-url">${escapeHtml(link.url)}</div>
@@ -102,6 +104,7 @@ function renderLinks() {
                     <span>Added: ${new Date(link.addedAt).toLocaleString()}</span>
                     <span>Attempts: ${link.attempts}</span>
                     ${link.fetchedAt ? `<span>Fetched: ${new Date(link.fetchedAt).toLocaleString()}</span>` : ''}
+                    ${link.backblazeUrl ? `<span>Backblaze: <a href="${link.backblazeUrl}" target="_blank">View</a></span>` : ''}
                 </div>
             </div>
             <div class="link-actions">
@@ -120,12 +123,23 @@ function renderLinks() {
                         Retry
                     </button>` : ''
                 }
+                ${isYouTubeVideo ? `
+                    <button class="link-btn redownload-btn" onclick="redownloadVideo('${link.id}', '${escapeHtml(link.url)}')">
+                        Re-download
+                    </button>
+                    <button class="link-btn reupload-btn" onclick="reuploadVideo('${link.id}', '${escapeHtml(link.url)}')">
+                        Re-upload
+                    </button>
+                    <button class="link-btn settings-btn" onclick="openVideoSettingsModal('${link.id}')">
+                        Settings
+                    </button>
+                ` : ''}
                 <button class="link-btn remove-btn" onclick="removeLink('${link.id}')">
                     Remove
                 </button>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 // Escape HTML to prevent XSS
@@ -378,6 +392,226 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the dashboard
     initializeDashboard();
 });
+
+// Re-download video from YouTube
+async function redownloadVideo(linkId, youtubeUrl) {
+    const link = links.find(l => l.id === linkId);
+    if (!link) return;
+    
+    // Update status
+    link.status = 'downloading';
+    renderLinks();
+    
+    try {
+        const response = await fetch('/api/video/redownload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                youtube_url: youtubeUrl
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            link.status = 'downloaded';
+            link.localPath = result.file_path;
+            link.videoTitle = result.video_title;
+            link.fileSize = result.file_size;
+            showToast('success', `Video downloaded successfully: ${result.video_title}`);
+        } else {
+            link.status = 'failed';
+            showToast('error', `Download failed: ${result.error}`);
+        }
+    } catch (error) {
+        link.status = 'failed';
+        showToast('error', `Download error: ${error.message}`);
+    }
+    
+    saveLinks();
+    renderLinks();
+}
+
+// Re-upload video to Backblaze
+async function reuploadVideo(linkId, youtubeUrl) {
+    const link = links.find(l => l.id === linkId);
+    if (!link) return;
+    
+    // Check if we have a local file path
+    if (!link.localPath && !youtubeUrl) {
+        showToast('error', 'No video file available. Please re-download first.');
+        return;
+    }
+    
+    // Update status
+    link.status = 'uploading';
+    renderLinks();
+    
+    try {
+        // If no local path, download first
+        if (!link.localPath) {
+            showToast('info', 'Downloading video first...');
+            const downloadResponse = await fetch('/api/video/redownload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    youtube_url: youtubeUrl
+                })
+            });
+            
+            const downloadResult = await downloadResponse.json();
+            
+            if (!downloadResult.success) {
+                throw new Error(`Download failed: ${downloadResult.error}`);
+            }
+            
+            link.localPath = downloadResult.file_path;
+            link.videoTitle = downloadResult.video_title;
+        }
+        
+        // Now upload to Backblaze
+        showToast('info', 'Uploading to Backblaze...');
+        const uploadResponse = await fetch('/api/video/reupload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                file_path: link.localPath,
+                remote_name: link.videoTitle ? `${link.videoTitle}.mp4` : undefined
+            })
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        
+        if (uploadResult.success) {
+            link.status = 'completed';
+            link.backblazeUrl = uploadResult.file_url;
+            link.backblazeFileId = uploadResult.file_id;
+            showToast('success', `Video uploaded successfully to Backblaze!`);
+            
+            // If we have Supabase configured, update the database
+            if (link.databaseId) {
+                updateSupabaseUrl(link.databaseId, uploadResult.file_url);
+            }
+        } else {
+            link.status = 'failed';
+            showToast('error', `Upload failed: ${uploadResult.error}`);
+        }
+    } catch (error) {
+        link.status = 'failed';
+        showToast('error', `Upload error: ${error.message}`);
+    }
+    
+    saveLinks();
+    renderLinks();
+}
+
+// Process complete video re-upload (download, upload, and update DB)
+async function processVideoReupload(linkId, youtubeUrl, databaseId) {
+    const link = links.find(l => l.id === linkId);
+    if (!link) return;
+    
+    if (!databaseId && !link.databaseId) {
+        showToast('error', 'No database ID provided. Please set the video ID first.');
+        return;
+    }
+    
+    // Update status
+    link.status = 'processing';
+    renderLinks();
+    
+    try {
+        showToast('info', 'Starting video re-processing...');
+        
+        const response = await fetch('/api/video/reprocess', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                youtube_url: youtubeUrl,
+                video_id: databaseId || link.databaseId,
+                table_name: 'videos'  // Can be customized
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            link.status = 'completed';
+            link.backblazeUrl = result.final_url;
+            link.databaseId = databaseId || link.databaseId;
+            showToast('success', 'Video successfully re-processed and database updated!');
+        } else {
+            link.status = 'failed';
+            showToast('error', `Processing failed: ${result.error}`);
+        }
+    } catch (error) {
+        link.status = 'failed';
+        showToast('error', `Processing error: ${error.message}`);
+    }
+    
+    saveLinks();
+    renderLinks();
+}
+
+// Update Supabase URL (helper function)
+async function updateSupabaseUrl(videoId, backblazeUrl) {
+    try {
+        // This would typically call a separate endpoint to update just the DB
+        // For now, it's handled within the reprocess endpoint
+        console.log(`Would update video ${videoId} with URL: ${backblazeUrl}`);
+    } catch (error) {
+        console.error('Error updating Supabase:', error);
+    }
+}
+
+// Video Settings Modal Functions
+let currentVideoLinkId = null;
+
+function openVideoSettingsModal(linkId) {
+    currentVideoLinkId = linkId;
+    const link = links.find(l => l.id === linkId);
+    
+    if (link) {
+        document.getElementById('videoDatabaseId').value = link.databaseId || '';
+        document.getElementById('videoTableName').value = link.tableName || 'videos';
+    }
+    
+    document.getElementById('videoSettingsModal').classList.add('show');
+}
+
+function closeVideoSettingsModal() {
+    document.getElementById('videoSettingsModal').classList.remove('show');
+    currentVideoLinkId = null;
+}
+
+function saveVideoSettings() {
+    if (!currentVideoLinkId) return;
+    
+    const link = links.find(l => l.id === currentVideoLinkId);
+    if (!link) return;
+    
+    const databaseId = document.getElementById('videoDatabaseId').value.trim();
+    const tableName = document.getElementById('videoTableName').value.trim() || 'videos';
+    
+    if (databaseId) {
+        link.databaseId = databaseId;
+        link.tableName = tableName;
+        saveLinks();
+        renderLinks();
+        showToast('success', 'Video settings saved successfully');
+    } else {
+        showToast('error', 'Please enter a database video ID');
+    }
+    
+    closeVideoSettingsModal();
+}
 
 // Auto-refresh stats every 5 seconds
 setInterval(() => {

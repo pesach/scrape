@@ -1,1 +1,5 @@
-requests>=2.31.0
+requests==2.31.0
+yt-dlp==2024.1.9
+supabase==2.3.0
+python-dotenv==1.0.0
+b2sdk==1.24.0
