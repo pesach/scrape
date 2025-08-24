@@ -24,108 +24,34 @@ class Database:
         self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
 
     async def create_video(self, video_data: Dict[str, Any]) -> VideoResponse:
-        """
-        Robust insertion for the `videos` table:
-         - Serializes datetime/date to ISO strings
-         - Removes None values
-         - Provides defaults for required fields (videourl, url, created_at, updated_at)
-         - Retries removing unknown columns when PostgREST returns PGRST204
-         - After successful insert, merges returned row with the payload and constructs VideoResponse
-        """
-        payload: Dict[str, Any] = dict(video_data)  # shallow copy
+        # --- Get current schema columns (cached in production for efficiency) ---
+        videos_columns = await self.get_table_columns("videos")
 
-        # --- Defaults for required columns (customize as needed) ---
-        # Use youtube_id to build user-friendly url if possible
-        youtube_id = payload.get("youtube_id") or ""
-        payload.setdefault("videourl", "videos/default.mp4")
-        payload.setdefault("url", f"https://www.youtube.com/watch?v={youtube_id}" if youtube_id else "https://www.youtube.com/")
+        # --- Set defaults for required fields ---
+        youtube_id = video_data.get("youtube_id", "")
+        video_data.setdefault("videourl", "videos/default.mp4")
+        video_data.setdefault("url", f"https://www.youtube.com/watch?v={youtube_id}" if youtube_id else "https://www.youtube.com/")
         now_iso = datetime.utcnow().isoformat()
-        payload.setdefault("created_at", now_iso)
-        payload.setdefault("updated_at", now_iso)
+        video_data.setdefault("created_at", now_iso)
+        video_data.setdefault("updated_at", now_iso)
 
-        # --- Normalize payload: serialize datetimes and coerce non-serializable objects ---
-        for k, v in list(payload.items()):
+        # --- Keep only columns that exist in the table ---
+        filtered_data = {k: v for k, v in video_data.items() if k in videos_columns}
+
+        # --- Serialize datetime/date objects ---
+        for k, v in filtered_data.items():
             if isinstance(v, (datetime, date)):
-                payload[k] = v.isoformat()
-            elif not isinstance(v, (str, int, float, bool, list, dict, type(None))):
-                try:
-                    json.dumps(v)
-                except Exception:
-                    payload[k] = str(v)
+                filtered_data[k] = v.isoformat()
 
-        # Remove None values (we already set defaults above)
-        payload = {k: v for k, v in payload.items() if v is not None}
+        # --- Insert into database ---
+        result = self.supabase.table("videos").insert(filtered_data).execute()
 
-        max_retries = 20
-        attempt = 0
-        removed_columns = []
+        if result.data:
+            # Merge server-returned values to satisfy Pydantic model
+            final_row = {**filtered_data, **(result.data[0] or {})}
+            return VideoResponse(**final_row)
 
-        while attempt < max_retries and payload:
-            try:
-                result = self.supabase.table("videos").insert(payload).execute()
-
-                # result.data may be None/empty in some cases (PostgREST config), so build final dict safely
-                returned_row = (result.data[0] if getattr(result, "data", None) else {}) or {}
-
-                # Merge: prefer server-returned values when present (returned_row overrides payload)
-                final_row = {**payload, **returned_row}
-
-                # Ensure created_at/updated_at exist in final_row
-                if not final_row.get("created_at"):
-                    final_row["created_at"] = datetime.utcnow().isoformat()
-                if not final_row.get("updated_at"):
-                    final_row["updated_at"] = datetime.utcnow().isoformat()
-                if not final_row.get("url"):
-                    final_row["url"] = f"https://www.youtube.com/watch?v={final_row.get('youtube_id','')}"
-
-                # Attempt to build VideoResponse and return
-                try:
-                    return VideoResponse(**final_row)
-                except Exception as ve:
-                    # Provide debug context for Pydantic errors
-                    logger.exception("VideoResponse validation failed. final_row keys: %s", list(final_row.keys()))
-                    raise
-
-            except APIError as e:
-                # Example message:
-                # "Could not find the 'thumbnail_url' column of 'videos' in the schema cache"
-                msg_obj = e.args[0] if e.args else str(e)
-                msg = msg_obj if isinstance(msg_obj, str) else json.dumps(msg_obj)
-                m = re.search(r"Could not find the '([^']+)' column", msg)
-                if m:
-                    bad_col = m.group(1)
-                    if bad_col in payload:
-                        payload.pop(bad_col, None)
-                        removed_columns.append(bad_col)
-                        attempt += 1
-                        logger.warning("Removed unknown column '%s' from payload and retrying (attempt %d).", bad_col, attempt)
-                        continue
-                # If we couldn't parse a PGRST204 unknown-column, re-raise for visibility
-                logger.exception("APIError during insert: %s", msg)
-                raise
-
-            except TypeError:
-                # JSON serialization problem: coerce problematic values to strings then retry
-                for k, v in list(payload.items()):
-                    try:
-                        json.dumps(v)
-                    except Exception:
-                        payload[k] = str(v)
-                attempt += 1
-                logger.warning("Coerced non-serializable values to strings and retrying (attempt %d).", attempt)
-                continue
-
-            except Exception:
-                # Unknown failure — re-raise so caller sees it
-                logger.exception("Unknown error during create_video insert")
-                raise
-
-        # If we exit loop without returning:
-        logger.error(
-            "Failed to insert video after %d attempts. Removed columns: %s. Final payload keys: %s",
-            attempt, removed_columns, list(payload.keys())
-        )
-        raise Exception("Failed to insert video after removing unknown columns or payload became empty")
+        raise Exception("Failed to create video entry")
 
     # --- The rest of your DB helper methods (unchanged) ---
     async def get_youtube_url(self, url_id: uuid.UUID) -> Optional[YouTubeURLResponse]:
