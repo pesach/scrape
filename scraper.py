@@ -15,6 +15,14 @@ import random
 
 logger = logging.getLogger(__name__)
 
+
+def serialize_dates(obj):
+    for k, v in obj.items():
+        if isinstance(v, (datetime, date)):
+            obj[k] = v.isoformat()
+    return obj
+
+
 class VideoScraper:
     """
     YouTube video scraper using yt-dlp or ScraperAPI
@@ -333,7 +341,8 @@ class VideoScraper:
         upload_date = None
         if info.get('upload_date'):
             try:
-                upload_date = datetime.strptime(info['upload_date'], '%Y%m%d').date()
+                dt = datetime.strptime(info['upload_date'], '%Y%m%d')
+                upload_date = dt.isoformat()  # Converts to "YYYY-MM-DD"
             except (ValueError, TypeError):
                 pass
         
@@ -421,6 +430,7 @@ class VideoScraper:
                     return False, f"Upload to B2 failed: {upload_result}"
                 
                 # Save video to database
+                video_data = serialize_dates(video_data)
                 video_record = await db.create_video(video_data)
                 
                 # Link video to URL

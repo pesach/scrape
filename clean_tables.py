@@ -1,7 +1,14 @@
 # clean_tables.py
 import asyncio
 from dotenv import load_dotenv
-load_dotenv()
+import os
+from dotenv import load_dotenv
+import pathlib
+
+env_path = pathlib.Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
+print(os.getenv("SUPABASE_URL"))
+print(os.getenv("SUPABASE_KEY"))
 
 from database import db  # your Database class wrapper
 
