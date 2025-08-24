@@ -125,13 +125,13 @@ function renderLinks() {
                 }
                 ${isYouTubeVideo ? `
                     <button class="link-btn redownload-btn" onclick="redownloadVideo('${link.id}', '${escapeHtml(link.url)}')">
-                        Re-download
+                        📥 Re-download
                     </button>
                     <button class="link-btn reupload-btn" onclick="reuploadVideo('${link.id}', '${escapeHtml(link.url)}')">
-                        Re-upload
+                        ☁️ Re-upload
                     </button>
                     <button class="link-btn settings-btn" onclick="openVideoSettingsModal('${link.id}')">
-                        Settings
+                        ⚙️ Settings
                     </button>
                 ` : ''}
                 <button class="link-btn remove-btn" onclick="removeLink('${link.id}')">
@@ -617,3 +617,45 @@ function saveVideoSettings() {
 setInterval(() => {
     updateStats();
 }, 5000);
+
+// Add sample YouTube links for testing
+function addSampleYouTubeLinks() {
+    const sampleLinks = [
+        {
+            id: 'sample-' + Date.now(),
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            status: 'completed',
+            addedAt: new Date().toISOString(),
+            fetchedAt: new Date().toISOString(),
+            attempts: 1,
+            videoTitle: 'Sample YouTube Video',
+            backblazeUrl: null
+        },
+        {
+            id: 'sample-' + (Date.now() + 1),
+            url: 'https://youtu.be/jNQXAC9IVRw',
+            status: 'completed',
+            addedAt: new Date().toISOString(),
+            fetchedAt: new Date().toISOString(),
+            attempts: 1,
+            videoTitle: 'Another Sample Video',
+            backblazeUrl: null
+        }
+    ];
+    
+    // Add sample links if no YouTube links exist
+    const hasYouTubeLinks = links.some(link => 
+        link.url && (link.url.includes('youtube.com') || link.url.includes('youtu.be'))
+    );
+    
+    if (!hasYouTubeLinks) {
+        links.push(...sampleLinks);
+        saveLinks();
+        renderLinks();
+        updateStats();
+        showToast('success', 'Added sample YouTube links for testing');
+    }
+}
+
+// Uncomment the line below to add sample YouTube links for testing
+// addSampleYouTubeLinks();
