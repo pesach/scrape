@@ -1,7 +1,7 @@
 requests>=2.31.0
 fastapi==0.104.1
 uvicorn==0.24.0
-yt-dlp==2023.12.30
+yt-dlp==2025.08.22
 supabase==2.3.0
 boto3==1.34.0
 celery==5.3.4
