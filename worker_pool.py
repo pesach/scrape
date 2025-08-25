@@ -13,7 +13,7 @@ import pathlib
 env_path = pathlib.Path(__file__).parent / ".env"
 if not env_path.exists():
     raise FileNotFoundError(f".env file not found at {env_path}")
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=env_path, override=True)
 
 # --- Logging setup ---
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
