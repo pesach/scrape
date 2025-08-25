@@ -5,9 +5,15 @@ import logging
 from datetime import datetime
 from dotenv import load_dotenv
 import httpx
+import pathlib
+
 
 # --- Load .env early ---
-load_dotenv()
+# Absolute path to your project .env
+env_path = pathlib.Path(__file__).parent / ".env"
+if not env_path.exists():
+    raise FileNotFoundError(f".env file not found at {env_path}")
+load_dotenv(dotenv_path=env_path)
 
 # --- Logging setup ---
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
