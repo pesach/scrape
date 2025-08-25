@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from datetime import datetime, date
-from models import URLType, VideoCreate
+from models import URLType, VideoCreate, VideoStatus
 from storage import storage, generate_video_key
 from database import db
 import uuid
@@ -374,6 +374,7 @@ class VideoScraper:
             'resolution': f"{best_format.get('width', 0)}x{best_format.get('height', 0)}" if best_format else None,
             'fps': best_format.get('fps') if best_format else None,
             'format_id': best_format.get('format_id') if best_format else None,
+            'status': 'pending',  # Initial status for new videos
         }
     
     async def scrape_single_video(self, url: str, youtube_url_id: uuid.UUID) -> Tuple[bool, str]:
@@ -405,6 +406,7 @@ class VideoScraper:
             
             # Process metadata
             video_data = self.process_video_metadata(info)
+            video_data['status'] = 'fetching'  # Mark as fetching when we start processing
             
             # Download video
             success, message, file_path = self.download_video(url, video_id, info)
@@ -426,8 +428,10 @@ class VideoScraper:
                 if upload_success:
                     video_data['b2_file_key'] = b2_key
                     video_data['b2_file_url'] = upload_result
+                    video_data['status'] = 'done'  # Mark as done after successful B2 upload
                     logger.info(f"Successfully uploaded video {video_id} to B2")
                 else:
+                    video_data['status'] = 'failed'  # Mark as failed if upload fails
                     logger.error(f"Failed to upload video {video_id} to B2: {upload_result}")
                     return False, f"Upload to B2 failed: {upload_result}"
                 

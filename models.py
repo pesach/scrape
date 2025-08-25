@@ -17,6 +17,12 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+class VideoStatus(str, Enum):
+    PENDING = "pending"
+    FETCHING = "fetching"
+    DONE = "done"
+    FAILED = "failed"
+
 class YouTubeURLCreate(BaseModel):
     url: str = Field(..., description="YouTube URL to scrape")
 
@@ -50,6 +56,7 @@ class VideoCreate(BaseModel):
     format_id: Optional[str] = None
     b2_file_key: Optional[str] = None
     b2_file_url: Optional[str] = None
+    status: Optional[VideoStatus] = VideoStatus.PENDING
 
 class VideoResponse(BaseModel):
     id: uuid.UUID
@@ -72,6 +79,7 @@ class VideoResponse(BaseModel):
     format_id: Optional[str] = None
     b2_file_key: Optional[str] = None
     b2_file_url: Optional[str] = None
+    status: Optional[VideoStatus] = VideoStatus.PENDING
     created_at: datetime
     updated_at: datetime
 
