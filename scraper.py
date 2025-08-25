@@ -468,6 +468,19 @@ class VideoScraper:
             Tuple of (success, message, videos_processed)
         """
         try:
+            # Detect and normalize channel URLs to ensure all videos are retrieved
+            # Channel URLs can be in formats: @handle, /channel/ID, /c/customname
+            original_url = url
+            if any(pattern in url for pattern in ['@', '/channel/', '/c/']):
+                # This is a channel URL
+                logger.info(f"Detected channel URL: {url}")
+                
+                # If the URL doesn't already end with /videos, append it
+                # This ensures yt-dlp retrieves all videos instead of just featured ones
+                if not url.rstrip('/').endswith('/videos'):
+                    url = url.rstrip('/') + '/videos'
+                    logger.info(f"Modified channel URL to retrieve all videos: {url}")
+            
             logger.info(f"Extracting playlist/channel info: {url}")
             
             # Extract playlist/channel information
