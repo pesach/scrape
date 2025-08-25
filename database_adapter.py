@@ -58,7 +58,7 @@ class ExistingVideosAdapter:
             'tags': video_data.get('tags', []),  # Keep as array or convert to string if needed
             
             # Status and privacy
-            'status': 'downloaded',  # Custom status for scraped videos
+            'status': video_data.get('status', 'pending'),  # Video processing status: pending/fetching/done/failed
             'privacy': 'public',  # Assume public since we can scrape it
             'allowdownloads': True,  # We downloaded it, so it's allowed
             

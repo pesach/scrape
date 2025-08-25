@@ -23,6 +23,13 @@ EXCEPTION
         RAISE NOTICE '✅ job_status enum already exists, skipping';
 END $$;
 
+DO $$ BEGIN
+    CREATE TYPE video_status AS ENUM ('pending', 'fetching', 'done', 'failed');
+EXCEPTION
+    WHEN duplicate_object THEN 
+        RAISE NOTICE '✅ video_status enum already exists, skipping';
+END $$;
+
 -- Check if videos table exists and create/modify accordingly
 DO $$ 
 DECLARE
@@ -116,6 +123,13 @@ BEGIN
             RAISE NOTICE '⚠️ categories column may already exist';
         END;
 
+        BEGIN
+            ALTER TABLE videos ADD COLUMN IF NOT EXISTS status video_status DEFAULT 'pending';
+            RAISE NOTICE '✅ Added status column';
+        EXCEPTION WHEN OTHERS THEN 
+            RAISE NOTICE '⚠️ status column may already exist';
+        END;
+
         -- Create unique index on youtube_id if it doesn't exist
         BEGIN
             CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_youtube_id ON videos(youtube_id) WHERE youtube_id IS NOT NULL;
@@ -149,6 +163,7 @@ BEGIN
             format_id TEXT,
             b2_file_key TEXT, -- key in Backblaze B2
             b2_file_url TEXT, -- public URL in B2
+            status video_status DEFAULT 'pending', -- track processing status
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
@@ -196,6 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_youtube_urls_url_type ON youtube_urls(url_type);
 CREATE INDEX IF NOT EXISTS idx_youtube_urls_submitted_at ON youtube_urls(submitted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_uploader ON videos(uploader);
 CREATE INDEX IF NOT EXISTS idx_videos_upload_date ON videos(upload_date DESC);
+CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
 CREATE INDEX IF NOT EXISTS idx_scraping_jobs_status ON scraping_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_scraping_jobs_youtube_url_id ON scraping_jobs(youtube_url_id);
 CREATE INDEX IF NOT EXISTS idx_url_videos_youtube_url_id ON url_videos(youtube_url_id);

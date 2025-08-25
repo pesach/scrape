@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from postgrest.exceptions import APIError
 from supabase import create_client, Client
 
-from models import URLType, JobStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
+from models import URLType, JobStatus, VideoStatus, YouTubeURLResponse, VideoResponse, ScrapingJobResponse
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,39 @@ class Database:
         if not config.SUPABASE_URL or not config.SUPABASE_KEY:
             raise ValueError("SUPABASE_URL and SUPABASE_KEY must be configured")
         self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+        self._table_columns_cache = {}
+    
+    async def get_table_columns(self, table_name: str) -> List[str]:
+        """Get column names for a table (cached for efficiency)"""
+        if table_name in self._table_columns_cache:
+            return self._table_columns_cache[table_name]
+        
+        # Query the information schema to get columns
+        # For Supabase, we'll use a simple approach - try to get one row and extract keys
+        try:
+            result = self.supabase.table(table_name).select("*").limit(1).execute()
+            if result.data:
+                columns = list(result.data[0].keys())
+            else:
+                # If no data, use default columns based on table name
+                if table_name == "videos":
+                    columns = ['id', 'youtube_id', 'url', 'title', 'description', 'duration', 
+                              'view_count', 'like_count', 'upload_date', 'uploader', 'uploader_id',
+                              'thumbnail_url', 'tags', 'categories', 'resolution', 'fps', 'file_size',
+                              'format_id', 'b2_file_key', 'b2_file_url', 'status', 'created_at', 'updated_at',
+                              'videourl', 'thumbnailurl', 'viewcount', 'likecount', 'dislikecount',
+                              'commentcount', 'channelid', 'category', 'privacy', 'allowdownloads']
+                else:
+                    columns = []
+            
+            self._table_columns_cache[table_name] = columns
+            return columns
+        except Exception as e:
+            logger.error(f"Error getting columns for table {table_name}: {e}")
+            # Return a sensible default for videos table
+            if table_name == "videos":
+                return ['id', 'youtube_id', 'url', 'title', 'description', 'status', 'created_at', 'updated_at']
+            return []
 
     async def create_video(self, video_data: Dict[str, Any]) -> VideoResponse:
         # --- Get current schema columns (cached in production for efficiency) ---
@@ -31,6 +64,7 @@ class Database:
         youtube_id = video_data.get("youtube_id", "")
         video_data.setdefault("videourl", "videos/default.mp4")
         video_data.setdefault("url", f"https://www.youtube.com/watch?v={youtube_id}" if youtube_id else "https://www.youtube.com/")
+        video_data.setdefault("status", "pending")  # Default status for new videos
         now_iso = datetime.utcnow().isoformat()
         video_data.setdefault("created_at", now_iso)
         video_data.setdefault("updated_at", now_iso)
@@ -122,6 +156,39 @@ class Database:
         }
         result = self.supabase.table("url_videos").upsert(data).execute()
         return result.data
+    
+    async def get_pending_videos(self, limit: int = 10) -> List[VideoResponse]:
+        """Get videos with status 'pending' for processing"""
+        result = self.supabase.table("videos").select("*").eq("status", VideoStatus.PENDING.value).limit(limit).order("created_at").execute()
+        return [VideoResponse(**item) for item in result.data or []]
+    
+    async def update_video_status(self, video_id: uuid.UUID, status: VideoStatus) -> Optional[VideoResponse]:
+        """Update the status of a video"""
+        update_data = {
+            "status": status.value,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        result = self.supabase.table("videos").update(update_data).eq("id", str(video_id)).execute()
+        if result.data:
+            return VideoResponse(**result.data[0])
+        return None
+    
+    async def mark_video_as_fetching(self, video_id: uuid.UUID) -> Optional[VideoResponse]:
+        """Mark a video as being fetched (with atomic update to prevent race conditions)"""
+        # First check if the video is still pending
+        check_result = self.supabase.table("videos").select("status").eq("id", str(video_id)).execute()
+        if not check_result.data or check_result.data[0].get("status") != VideoStatus.PENDING.value:
+            return None  # Already being processed or done
+        
+        # Update only if still pending (race condition protection)
+        update_data = {
+            "status": VideoStatus.FETCHING.value,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        result = self.supabase.table("videos").update(update_data).eq("id", str(video_id)).eq("status", VideoStatus.PENDING.value).execute()
+        if result.data:
+            return VideoResponse(**result.data[0])
+        return None
 
 
 # Global database instance
