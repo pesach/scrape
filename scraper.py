@@ -457,6 +457,22 @@ class VideoScraper:
         """
         try:
             logger.info(f"Extracting playlist/channel info: {url}")
+        
+        # FIX: Ensure channel URLs have /videos suffix to get all videos
+        if '@' in url or '/channel/' in url or '/c/' in url:
+            if not url.endswith('/videos') and not url.endswith('/playlists'):
+                url = url.rstrip('/') + '/videos'
+                logger.info(f'Added /videos suffix to channel URL: {url}')
+        
+        
+        # FIX: Ensure channel URLs have /videos suffix to get all videos
+        # Without /videos, yt-dlp only returns featured videos (usually 3)
+        # With /videos, it returns all channel videos
+        if '@' in url or '/channel/' in url or '/c/' in url:
+            if not url.endswith('/videos') and not url.endswith('/playlists') and '?' not in url:
+                url = url.rstrip('/') + '/videos'
+                logger.info(f"Added /videos suffix to channel URL for complete video list: {url}")
+
             
             # Extract playlist/channel information
             ydl_opts = {
